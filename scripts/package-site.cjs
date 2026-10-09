@@ -18,7 +18,7 @@ if (unsafe.length) throw Error('Unsafe files are tracked; refusing to package a 
 const source = path.join(output, 'source', 'Better-Than-GrokBot');
 fs.rmSync(source, { recursive: true, force: true });
 fs.mkdirSync(source, { recursive: true });
-for (const file of files.filter(f => !f.startsWith('.git'))) {
+for (const file of files.filter(f => !f.startsWith('.git') || f === '.gitignore' || f === '.gitattributes')) {
   const target = path.join(source, file);
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.copyFileSync(path.join(root, file), target);
