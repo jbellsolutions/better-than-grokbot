@@ -1,0 +1,214 @@
+[
+  {
+    "profile": "gtm-campaign-home-services",
+    "title": "Home Services Campaign Manager",
+    "charter": "campaign-home-services/CHARTER.md",
+    "sources": [
+      {
+        "path": "/Users/home/Desktop/GrokBot Analyzed/github-package/analysis/profile-specs/campaign-home-services/ROLE.md",
+        "sha256": "2f8bce2d464a31f7d31c012aca36e0f28465a3769dc779cf3a99bff51ba67053"
+      }
+    ]
+  },
+  {
+    "profile": "gtm-list-manager",
+    "title": "List Manager",
+    "charter": "list-manager/CHARTER.md",
+    "sources": [
+      {
+        "path": "/Users/home/Desktop/GrokBot Analyzed/github-package/analysis/profile-specs/list-manager/ROLE.md",
+        "sha256": "fe7462cf06c4b7d00c086fd75d88702695bd0ff33464e434161613484198b9a3"
+      },
+      {
+        "path": "/Users/home/Desktop/GrokBot Analyzed/Launch Charters 2026-10-08/grokbot-email-only-charters-2026-10-08/agents/03-list-manager.md",
+        "sha256": "f7771fb4878adb1214496b32ca217b4bf25363e92e1725149c9929fb642eb9a8"
+      }
+    ]
+  },
+  {
+    "profile": "gtm-data",
+    "title": "Data Agent",
+    "charter": "data/CHARTER.md",
+    "sources": [
+      {
+        "path": "/Users/home/Desktop/GrokBot Analyzed/github-package/analysis/profile-specs/data/ROLE.md",
+        "sha256": "c76a43c6d4ea436be38b3f2ed0b1668359f3ddb32aac652acda4fa09c4a7fdf7"
+      }
+    ]
+  },
+  {
+    "profile": "gtm-campaign-francois",
+    "title": "Francois Campaign Manager",
+    "charter": "campaign-francois/CHARTER.md",
+    "sources": [
+      {
+        "path": "/Users/home/Desktop/GrokBot Analyzed/github-package/analysis/profile-specs/campaign-francois/ROLE.md",
+        "sha256": "75552896eeca559ce0590703c7fc6bcfcc84483d76457afeece2fd21073c0b8e"
+      }
+    ]
+  },
+  {
+    "profile": "gtm-campaign-ai-guy",
+    "title": "AI Guy Campaign Manager",
+    "charter": "campaign-ai-guy/CHARTER.md",
+    "sources": [
+      {
+        "path": "/Users/home/Desktop/GrokBot Analyzed/github-package/analysis/profile-specs/campaign-ai-guy/ROLE.md",
+        "sha256": "a774b427b1867fb3697b4022999b5f2cc187722d27dfd2e0708ca04b512c72c5"
+      }
+    ]
+  },
+  {
+    "profile": "gtm-campaign-agency",
+    "title": "Marketing Agencies Campaign Manager",
+    "charter": "campaign-agency/CHARTER.md",
+    "sources": [
+      {
+        "path": "/Users/home/Desktop/GrokBot Analyzed/github-package/analysis/profile-specs/campaign-agency/ROLE.md",
+        "sha256": "8780d74fabf3f496d2979fcccc1d37b2043d4b482b487cb18ae7b571e27d8597"
+      }
+    ]
+  },
+  {
+    "profile": "gtm-campaign-revpartners",
+    "title": "Revenue Partnerships Campaign Manager",
+    "charter": "campaign-revpartners/CHARTER.md",
+    "sources": [
+      {
+        "path": "/Users/home/Desktop/GrokBot Analyzed/github-package/analysis/profile-specs/campaign-revpartners/ROLE.md",
+        "sha256": "d9184acc8655a2d6728266ee872264027ef15fb58604b816b16cd510f741886d"
+      }
+    ]
+  },
+  {
+    "profile": "gtm-instantly",
+    "title": "Instantly Operator",
+    "charter": "instantly/CHARTER.md",
+    "sources": [
+      {
+        "path": "/Users/home/Desktop/GrokBot Analyzed/github-package/analysis/profile-specs/instantly/ROLE.md",
+        "sha256": "1886e685962a14cb9b44795a73f71bb14d3af45630204bb5b52ad993051a32ad"
+      },
+      {
+        "path": "/Users/home/Desktop/GrokBot Analyzed/Launch Charters 2026-10-08/grokbot-email-only-charters-2026-10-08/agents/07-instantly-operator.md",
+        "sha256": "f3cbea7401149cdeab7647bc18e46febe5694b1954677e294162974565bbc678"
+      }
+    ]
+  },
+  {
+    "profile": "gtm-newsletter-smtp",
+    "title": "SMTP Newsletter Operator",
+    "charter": "newsletter-smtp/CHARTER.md",
+    "sources": [
+      {
+        "path": "/Users/home/Desktop/GrokBot Analyzed/github-package/analysis/profile-specs/newsletter-smtp/ROLE.md",
+        "sha256": "18b32c524bd976827ab1f97e014b54c2e9df6803c9babb6b818a8fe294a94571"
+      },
+      {
+        "path": "/Users/home/Desktop/GrokBot Analyzed/Launch Charters 2026-10-08/grokbot-email-only-charters-2026-10-08/agents/08-smtp-newsletter-operator.md",
+        "sha256": "bd5890da9ff828ac6871b7dd951227838ef298f1b7d5a3289b3a4d285d27db2a"
+      }
+    ]
+  },
+  {
+    "profile": "gtm-deliverability",
+    "title": "ESP and Deliverability",
+    "charter": "deliverability/CHARTER.md",
+    "sources": [
+      {
+        "path": "/Users/home/Desktop/GrokBot Analyzed/github-package/analysis/profile-specs/deliverability/ROLE.md",
+        "sha256": "938dc3fb91a126c02998938b7e7611923feed414e7687051d954a1d9dd537fd3"
+      },
+      {
+        "path": "/Users/home/Desktop/GrokBot Analyzed/Launch Charters 2026-10-08/grokbot-email-only-charters-2026-10-08/agents/06-esp-deliverability.md",
+        "sha256": "73856bbea41e9ad66a3b13dd0e9bc5450eb8ebf300ae612107555c08ee527c9f"
+      }
+    ]
+  },
+  {
+    "profile": "gtm-replies",
+    "title": "Reply Agent",
+    "charter": "replies/CHARTER.md",
+    "sources": [
+      {
+        "path": "/Users/home/Desktop/GrokBot Analyzed/github-package/analysis/profile-specs/replies/ROLE.md",
+        "sha256": "8ea3891c2da90ac8552b5ed901703331543a7105270965ae5dd9ec4202364f2d"
+      },
+      {
+        "path": "/Users/home/Desktop/GrokBot Analyzed/Launch Charters 2026-10-08/grokbot-email-only-charters-2026-10-08/agents/09-reply-agent.md",
+        "sha256": "9d7f5194cf2c399d3f9f2115178fa6c18e534aaf3e608efdfb108f0465c0603b"
+      }
+    ]
+  },
+  {
+    "profile": "gtm-crm",
+    "title": "Attio CRM Operator",
+    "charter": "crm/CHARTER.md",
+    "sources": [
+      {
+        "path": "/Users/home/Desktop/GrokBot Analyzed/github-package/analysis/profile-specs/crm/ROLE.md",
+        "sha256": "50acf1956ee8b395ce87f850c1df7ba3ff3e3f2d30264b3abd99c7ebb1924bab"
+      },
+      {
+        "path": "/Users/home/Desktop/GrokBot Analyzed/Launch Charters 2026-10-08/grokbot-email-only-charters-2026-10-08/agents/10-attio-crm-optional.md",
+        "sha256": "96f3fa50f4eecfc46a3a993165dfa87fe8b655225bad82ade61140b3c4227447"
+      }
+    ]
+  },
+  {
+    "profile": "gtm-clickup",
+    "title": "ClickUp Operator",
+    "charter": "clickup/CHARTER.md",
+    "sources": [
+      {
+        "path": "/Users/home/Desktop/GrokBot Analyzed/github-package/analysis/profile-specs/ops/ROLE.md",
+        "sha256": "de96d0e56668fb3a03135d88802030ddc6a3952854ddda993ee8d3e9abfc6220"
+      }
+    ]
+  },
+  {
+    "profile": "gtm-email-writer",
+    "title": "Custom Email Writer",
+    "charter": "email-writer/CHARTER.md",
+    "sources": [
+      {
+        "path": "/Users/home/Desktop/GrokBot Analyzed/github-package/analysis/profile-specs/email-writer/ROLE.md",
+        "sha256": "0a77d9becdce22d87e519ef01d70c7cfae89101dd538efedc0b22848c78de876"
+      },
+      {
+        "path": "/Users/home/Desktop/GrokBot Analyzed/Launch Charters 2026-10-08/grokbot-email-only-charters-2026-10-08/agents/04-custom-email-writer.md",
+        "sha256": "9fc8dfeeb59af129c4768cd3664c6b488d7073383f1d563f840af6cc41b7f0b0"
+      }
+    ]
+  },
+  {
+    "profile": "gtm-email-campaign-manager",
+    "title": "Overall Email Campaign Manager",
+    "charter": "email-campaign-manager/CHARTER.md",
+    "sources": [
+      {
+        "path": "/Users/home/Desktop/GrokBot Analyzed/github-package/analysis/profile-specs/ops/ROLE.md",
+        "sha256": "de96d0e56668fb3a03135d88802030ddc6a3952854ddda993ee8d3e9abfc6220"
+      },
+      {
+        "path": "/Users/home/Desktop/GrokBot Analyzed/Launch Charters 2026-10-08/grokbot-email-only-charters-2026-10-08/agents/02-campaign-manager.md",
+        "sha256": "37b2e2aae19fab7bb3ca7c1734f78729f92d03dea1b679fdcc4931569693d987"
+      }
+    ]
+  },
+  {
+    "profile": "gtm-editorial",
+    "title": "Editorial",
+    "charter": "editorial/CHARTER.md",
+    "sources": [
+      {
+        "path": "/Users/home/Desktop/GrokBot Analyzed/github-package/analysis/profile-specs/editorial/ROLE.md",
+        "sha256": "1f3d2dd3bc14eb2f1a4f1de452ec50659912df3955252b1869cf0567a51b39d4"
+      },
+      {
+        "path": "/Users/home/Desktop/GrokBot Analyzed/Launch Charters 2026-10-08/grokbot-email-only-charters-2026-10-08/agents/05-editorial.md",
+        "sha256": "45d4991c287b9c463b0efb46223b7593c1714527ae2b8c579fbd1771567f93a1"
+      }
+    ]
+  }
+]

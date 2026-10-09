@@ -1,0 +1,33 @@
+{
+  "date": "2026-10-08",
+  "installation": "Bops Self-Hosted on local Mac; two isolated business coordinators",
+  "source": {
+    "bots": 30,
+    "conversations": 40,
+    "routines": 46,
+    "sourceRoutinesMarkedEnabled": 9,
+    "focusedReadbacks": 24,
+    "reconstructionCharters": 4,
+    "referenceRecordsPerInstance": 67
+  },
+  "checks": {
+    "selfhostTests": {"passed": 41, "failed": 0},
+    "pythonBridgeTests": {"passed": 5, "failed": 0},
+    "typescript": "pass",
+    "eslint": "pass",
+    "productionBuildAndInstall": "pass",
+    "actualHermesHeadless": {"aiGuy": "HERMES_BRIDGE_OK", "revenuePartners": "HERMES_BRIDGE_OK"},
+    "actualHermesLeasedScreen": {"aiGuy": "HERMES_BRIDGE_OK", "revenuePartners": "HERMES_BRIDGE_OK"},
+    "currentWorkUI": "rendered and visually inspected",
+    "apiBothInstances": "30 profiles, 67 source records, four charters, campaigns 71/72/73, one excluded Beehiiv profile, zero leased screens",
+    "sharedScreenLimit": 4
+  },
+  "limitations": [
+    "Source app reports do not independently verify provider state or constitute complete tool transcripts.",
+    "No outbound replies, invites, campaign launches or source routine changes were performed.",
+    "Existing Hermes services and desktop displays remain independent of private Bops job screens.",
+    "Live CRM/Instantly contacts and external connected tools are not a completed migration.",
+    "Campaign copy, offers, destination URLs, seed clearance and applicable approvals remain open.",
+    "The four reconstruction charters are adopted task context, not recovered original automation prompts."
+  ]
+}

@@ -1,0 +1,349 @@
+{
+  "checkedAt": "2026-10-07T23:20:10.206Z",
+  "source": "https://openrouter.ai/api/v1/models",
+  "total": 467,
+  "eligible": 203,
+  "caseCount": 20,
+  "cases": [
+    {
+      "id": "z-ai/glm-5.3-flash",
+      "selectable": true,
+      "input": [
+        "text",
+        "image",
+        "video"
+      ],
+      "tools": true,
+      "efforts": [
+        "max",
+        "high",
+        "low"
+      ],
+      "promptPerMillion": 0.15,
+      "completionPerMillion": 0.5
+    },
+    {
+      "id": "x-ai/grok-4.7",
+      "selectable": true,
+      "input": [
+        "text",
+        "image",
+        "file"
+      ],
+      "tools": true,
+      "efforts": [
+        "xhigh",
+        "high",
+        "medium",
+        "low"
+      ],
+      "promptPerMillion": 2,
+      "completionPerMillion": 6
+    },
+    {
+      "id": "x-ai/grok-4.6",
+      "selectable": true,
+      "input": [
+        "text",
+        "image",
+        "file"
+      ],
+      "tools": true,
+      "efforts": [
+        "xhigh",
+        "high",
+        "medium",
+        "low"
+      ],
+      "promptPerMillion": 2,
+      "completionPerMillion": 6
+    },
+    {
+      "id": "x-ai/grok-4.5",
+      "selectable": true,
+      "input": [
+        "text",
+        "image",
+        "file"
+      ],
+      "tools": true,
+      "efforts": [
+        "high",
+        "medium",
+        "low"
+      ],
+      "promptPerMillion": 2,
+      "completionPerMillion": 6
+    },
+    {
+      "id": "x-ai/grok-build-0.1",
+      "selectable": true,
+      "input": [
+        "text",
+        "image",
+        "file"
+      ],
+      "tools": true,
+      "efforts": [],
+      "promptPerMillion": 1,
+      "completionPerMillion": 2
+    },
+    {
+      "id": "x-ai/grok-4.3",
+      "selectable": true,
+      "input": [
+        "text",
+        "image",
+        "file"
+      ],
+      "tools": true,
+      "efforts": [
+        "high",
+        "medium",
+        "low",
+        "none"
+      ],
+      "promptPerMillion": 1.25,
+      "completionPerMillion": 2.5
+    },
+    {
+      "id": "x-ai/grok-4.3:batch",
+      "selectable": false,
+      "input": [
+        "text",
+        "image",
+        "file"
+      ],
+      "tools": true,
+      "efforts": [
+        "high",
+        "medium",
+        "low",
+        "none"
+      ],
+      "promptPerMillion": 1,
+      "completionPerMillion": 2
+    },
+    {
+      "id": "x-ai/grok-4.20-multi-agent",
+      "selectable": false,
+      "input": [
+        "text",
+        "image",
+        "file"
+      ],
+      "tools": false,
+      "efforts": [
+        "xhigh",
+        "high",
+        "medium",
+        "low"
+      ],
+      "promptPerMillion": 1.25,
+      "completionPerMillion": 2.5
+    },
+    {
+      "id": "x-ai/grok-4.20",
+      "selectable": true,
+      "input": [
+        "text",
+        "image",
+        "file"
+      ],
+      "tools": true,
+      "efforts": [],
+      "promptPerMillion": 1.25,
+      "completionPerMillion": 2.5
+    },
+    {
+      "id": "anthropic/claude-haiku-5.5",
+      "selectable": true,
+      "input": [
+        "text",
+        "image",
+        "file"
+      ],
+      "tools": true,
+      "efforts": [
+        "max",
+        "xhigh",
+        "high",
+        "medium",
+        "low"
+      ],
+      "promptPerMillion": 0.09999999999999999,
+      "completionPerMillion": 0.5
+    },
+    {
+      "id": "anthropic/claude-haiku-5.5:batch",
+      "selectable": false,
+      "input": [
+        "text",
+        "image",
+        "file"
+      ],
+      "tools": true,
+      "efforts": [
+        "max",
+        "xhigh",
+        "high",
+        "medium",
+        "low"
+      ],
+      "promptPerMillion": 0.049999999999999996,
+      "completionPerMillion": 0.25
+    },
+    {
+      "id": "google/gemini-nano-banana-2.1",
+      "selectable": true,
+      "input": [
+        "image",
+        "text"
+      ],
+      "tools": true,
+      "efforts": [
+        "high",
+        "minimal"
+      ],
+      "promptPerMillion": 1.5,
+      "completionPerMillion": 7.5
+    },
+    {
+      "id": "mistralai/mistral-large-4-0",
+      "selectable": true,
+      "input": [
+        "text",
+        "image"
+      ],
+      "tools": true,
+      "efforts": [
+        "high",
+        "none"
+      ],
+      "promptPerMillion": 0.6799999999999999,
+      "completionPerMillion": 2.09
+    },
+    {
+      "id": "inclusionai/ling-3.1-flash",
+      "selectable": false,
+      "input": [
+        "text"
+      ],
+      "tools": true,
+      "efforts": [],
+      "promptPerMillion": 0,
+      "completionPerMillion": 0
+    },
+    {
+      "id": "apodex/apodex-1.1-mini:free",
+      "selectable": false,
+      "input": [
+        "text"
+      ],
+      "tools": true,
+      "efforts": [],
+      "promptPerMillion": 0,
+      "completionPerMillion": 0
+    },
+    {
+      "id": "unbiased/pareto-26.10-preview",
+      "selectable": true,
+      "input": [
+        "text",
+        "image"
+      ],
+      "tools": true,
+      "efforts": [],
+      "promptPerMillion": 0.7999999999999999,
+      "completionPerMillion": 3.1999999999999997
+    },
+    {
+      "id": "openai/gpt-6.1-sol-pro",
+      "selectable": true,
+      "input": [
+        "file",
+        "image",
+        "text"
+      ],
+      "tools": true,
+      "efforts": [
+        "max",
+        "xhigh",
+        "high",
+        "medium",
+        "low"
+      ],
+      "promptPerMillion": 2,
+      "completionPerMillion": 10
+    },
+    {
+      "id": "openai/gpt-6.1-sol",
+      "selectable": true,
+      "input": [
+        "file",
+        "image",
+        "text"
+      ],
+      "tools": true,
+      "efforts": [
+        "max",
+        "xhigh",
+        "high",
+        "medium",
+        "low"
+      ],
+      "promptPerMillion": 2,
+      "completionPerMillion": 10
+    },
+    {
+      "id": "anthropic/claude-sonnet-5.5",
+      "selectable": true,
+      "input": [
+        "text",
+        "image",
+        "file"
+      ],
+      "tools": true,
+      "efforts": [
+        "max",
+        "xhigh",
+        "high",
+        "medium",
+        "low"
+      ],
+      "promptPerMillion": 2,
+      "completionPerMillion": 10
+    },
+    {
+      "id": "anthropic/claude-sonnet-5.5:batch",
+      "selectable": false,
+      "input": [
+        "text",
+        "image",
+        "file"
+      ],
+      "tools": true,
+      "efforts": [
+        "max",
+        "xhigh",
+        "high",
+        "medium",
+        "low"
+      ],
+      "promptPerMillion": 1,
+      "completionPerMillion": 5
+    }
+  ],
+  "scope": "Read-only provider metadata. Eligibility means advertised tool/image/text support; it does not guarantee every provider endpoint or task succeeds. Existing GLM default retained. User chooses any model change and sees listed rates.",
+  "live": {
+    "model": "x-ai/grok-4.7",
+    "chat": "GROK connection ready",
+    "session": "ses_muyqiqif77u0",
+    "runsOn": "cloud",
+    "tool": "cloud_shell",
+    "output": "Linux",
+    "verified": true,
+    "preferencesRestored": true,
+    "firstCheck": "An auto-routed test was sent to Codex because its negated instruction contained use my Mac. It did not validate Grok tools. The follow-up used explicit cloud wording; persisted OpenRouter history confirms the actual cloud_shell invocation."
+  }
+}

@@ -1,0 +1,420 @@
+[
+  {
+    "id": "ops",
+    "name": "Operations",
+    "instances": [
+      "ai-guy",
+      "revenue-partners"
+    ],
+    "optional": false,
+    "screen": "none",
+    "instructions": "Task routing becomes the Ops entry point.\nOwn objectives, budgets, routing, approvals and one exception digest.\nKeep a sole ClickUp writer adapter; batch ops updates, never prospect records.\nVersioned knowledge snapshots and approved batched updates; no daily idle agent.\nTriggered by a real upcoming external call; use CRM and approved offer facts.\nCalendar/go-no-go becomes a campaign-control skill; drop dead lane instructions.\nRecording calendar and brief nudge; optional, outside core revenue pilot.\nPreserve fleet pause and all source holds. Draft and research only until a specific release. Dream work is briefs only; Outflo is replies only. Never revive missing routine prompts. Never bypass sole-writer adapters. Do not start helper agents.",
+    "sources": [
+      {
+        "id": "a641b4f3-51bd-4e03-a9c1-4dce4b5afd32",
+        "name": "Grok Bot",
+        "decision": "Merge"
+      },
+      {
+        "id": "dee80356-b940-4789-8057-dc33c1f052c8",
+        "name": "Head of operations",
+        "decision": "Keep"
+      },
+      {
+        "id": "16cb5962-df63-46de-b33d-dcf74b8291e7",
+        "name": "ClickUp Project Manager",
+        "decision": "Service/skill"
+      },
+      {
+        "id": "6d23cee6-382c-48f3-8c7f-674695b2c819",
+        "name": "Single Brain",
+        "decision": "Service/skill"
+      },
+      {
+        "id": "89a4b313-f6f2-4b11-942a-eef261c11bf4",
+        "name": "Call Prep",
+        "decision": "On-demand skill"
+      },
+      {
+        "id": "f307b1d3-ffd2-4421-8bb6-5933f47c1420",
+        "name": "Campaign Manager",
+        "decision": "Merge legacy seat"
+      },
+      {
+        "id": "bdb29885-eef7-46cc-97dc-0f07c0715337",
+        "name": "Content Accountability Manager",
+        "decision": "On-demand skill"
+      }
+    ]
+  },
+  {
+    "id": "crm",
+    "name": "CRM",
+    "instances": [
+      "ai-guy",
+      "revenue-partners"
+    ],
+    "optional": false,
+    "screen": "none",
+    "instructions": "Sole Attio writer; lifecycle, partner attribution and commission records.\nPreserve fleet pause and all source holds. Draft and research only until a specific release. Dream work is briefs only; Outflo is replies only. Never revive missing routine prompts. Never bypass sole-writer adapters. Do not start helper agents.",
+    "sources": [
+      {
+        "id": "b91a824d-2984-4db8-a046-adce00c6945a",
+        "name": "Attio CRM Operator",
+        "decision": "Keep"
+      }
+    ]
+  },
+  {
+    "id": "email-writer",
+    "name": "Writer",
+    "instances": [
+      "ai-guy",
+      "revenue-partners"
+    ],
+    "optional": false,
+    "screen": "none",
+    "instructions": "Evidence-backed per-lead custom copy and split variables; no uploads or sends.\nPreserve fleet pause and all source holds. Draft and research only until a specific release. Dream work is briefs only; Outflo is replies only. Never revive missing routine prompts. Never bypass sole-writer adapters. Do not start helper agents.",
+    "sources": [
+      {
+        "id": "4bf756da-2c3e-4e8a-9ef5-fc48ad0c1e32",
+        "name": "Custom Email Writer",
+        "decision": "Keep"
+      }
+    ]
+  },
+  {
+    "id": "data",
+    "name": "Data",
+    "instances": [
+      "ai-guy",
+      "revenue-partners"
+    ],
+    "optional": false,
+    "screen": "optional",
+    "instructions": "Data Box plus bounded direct-provider adapters; costed pulls and enrichment.\nPreserve fleet pause and all source holds. Draft and research only until a specific release. Dream work is briefs only; Outflo is replies only. Never revive missing routine prompts. Never bypass sole-writer adapters. Do not start helper agents.",
+    "sources": [
+      {
+        "id": "14eb469d-d951-4f01-a232-b7b0b7c01800",
+        "name": "Data Agent",
+        "decision": "Keep"
+      }
+    ]
+  },
+  {
+    "id": "deliverability",
+    "name": "Deliverability",
+    "instances": [
+      "ai-guy",
+      "revenue-partners"
+    ],
+    "optional": false,
+    "screen": "optional",
+    "instructions": "Verification, DNS, placement, shared-domain risk and hold/quarantine decisions.\nPreserve fleet pause and all source holds. Draft and research only until a specific release. Dream work is briefs only; Outflo is replies only. Never revive missing routine prompts. Never bypass sole-writer adapters. Do not start helper agents.",
+    "sources": [
+      {
+        "id": "9c24de0c-8b2f-451c-aa2e-5a6021dad703",
+        "name": "ESP & Deliverability",
+        "decision": "Keep"
+      }
+    ]
+  },
+  {
+    "id": "editorial",
+    "name": "Editorial",
+    "instances": [
+      "ai-guy",
+      "revenue-partners"
+    ],
+    "optional": false,
+    "screen": "none",
+    "instructions": "Independent claims, charter and copy QC; approve versioned batch artifacts.\nPreserve fleet pause and all source holds. Draft and research only until a specific release. Dream work is briefs only; Outflo is replies only. Never revive missing routine prompts. Never bypass sole-writer adapters. Do not start helper agents.",
+    "sources": [
+      {
+        "id": "b910755d-74b1-4f49-9949-12ea15530034",
+        "name": "Editorial",
+        "decision": "Keep"
+      }
+    ]
+  },
+  {
+    "id": "instantly",
+    "name": "Instantly",
+    "instances": [
+      "ai-guy",
+      "revenue-partners"
+    ],
+    "optional": false,
+    "screen": "optional",
+    "instructions": "Sole Instantly adapter owner; inventory, reservations, draft builds, uploads, sends.\nPreserve fleet pause and all source holds. Draft and research only until a specific release. Dream work is briefs only; Outflo is replies only. Never revive missing routine prompts. Never bypass sole-writer adapters. Do not start helper agents.",
+    "sources": [
+      {
+        "id": "d9eb1332-fe2f-493d-ab1d-2bc135ec614f",
+        "name": "Instantly Operator",
+        "decision": "Keep"
+      }
+    ]
+  },
+  {
+    "id": "lead-radar",
+    "name": "Lead Radar",
+    "instances": [
+      "revenue-partners"
+    ],
+    "optional": false,
+    "screen": "none",
+    "instructions": "Read hosted results and run state; do not duplicate the hosted scheduler.\nPreserve fleet pause and all source holds. Draft and research only until a specific release. Dream work is briefs only; Outflo is replies only. Never revive missing routine prompts. Never bypass sole-writer adapters. Do not start helper agents.",
+    "sources": [
+      {
+        "id": "16761fab-6ac2-4554-af0d-78465ed56a3c",
+        "name": "Lead Radar",
+        "decision": "Keep"
+      }
+    ]
+  },
+  {
+    "id": "list-manager",
+    "name": "List Manager",
+    "instances": [
+      "ai-guy",
+      "revenue-partners"
+    ],
+    "optional": false,
+    "screen": "none",
+    "instructions": "Contact identity, list inventory, source, suppression and cross-lane dedupe.\nPreserve fleet pause and all source holds. Draft and research only until a specific release. Dream work is briefs only; Outflo is replies only. Never revive missing routine prompts. Never bypass sole-writer adapters. Do not start helper agents.",
+    "sources": [
+      {
+        "id": "2d721e22-34c7-47f8-a9df-264741e64290",
+        "name": "List Manager",
+        "decision": "Keep"
+      }
+    ]
+  },
+  {
+    "id": "revenue-prospector",
+    "name": "Prospector",
+    "instances": [
+      "revenue-partners"
+    ],
+    "optional": false,
+    "screen": "optional",
+    "instructions": "Turn qualified intent into an offer and approved multi-channel plan.\nPreserve fleet pause and all source holds. Draft and research only until a specific release. Dream work is briefs only; Outflo is replies only. Never revive missing routine prompts. Never bypass sole-writer adapters. Do not start helper agents.",
+    "sources": [
+      {
+        "id": "2d8da138-b141-4fd9-bad3-d0c773da9521",
+        "name": "Prospecting Agent",
+        "decision": "Keep"
+      }
+    ]
+  },
+  {
+    "id": "replies",
+    "name": "Replies",
+    "instances": [
+      "ai-guy",
+      "revenue-partners"
+    ],
+    "optional": false,
+    "screen": "none",
+    "instructions": "Webhook-driven triage and playbook replies; enqueue execution to channel owners.\nPreserve fleet pause and all source holds. Draft and research only until a specific release. Dream work is briefs only; Outflo is replies only. Never revive missing routine prompts. Never bypass sole-writer adapters. Do not start helper agents.",
+    "sources": [
+      {
+        "id": "3e0b757d-0c45-4b83-8150-ee12e0b5528e",
+        "name": "Reply Agent",
+        "decision": "Keep"
+      }
+    ]
+  },
+  {
+    "id": "campaign-ai-guy",
+    "name": "AI Guy Campaign",
+    "instances": [
+      "ai-guy"
+    ],
+    "optional": false,
+    "screen": "none",
+    "instructions": "Open-source lease / be their AI guy; preserve approved frameworks.\nPreserve fleet pause and all source holds. Draft and research only until a specific release. Dream work is briefs only; Outflo is replies only. Never revive missing routine prompts. Never bypass sole-writer adapters. Do not start helper agents.",
+    "sources": [
+      {
+        "id": "7c853b40-31b1-413d-b569-6f70dd97d0d3",
+        "name": "AI Guy Campaign Manager",
+        "decision": "Charter instance"
+      }
+    ]
+  },
+  {
+    "id": "affiliate-recruiter",
+    "name": "Affiliate Recruiter",
+    "instances": [
+      "ai-guy"
+    ],
+    "optional": true,
+    "screen": "none",
+    "instructions": "Recruit affiliates and list owners; distinct objective from creator-service campaign.\nPreserve fleet pause and all source holds. Draft and research only until a specific release. Dream work is briefs only; Outflo is replies only. Never revive missing routine prompts. Never bypass sole-writer adapters. Do not start helper agents.",
+    "sources": [
+      {
+        "id": "6ba5e479-e26e-40b6-bf58-feb81787a891",
+        "name": "Affiliate Program Manager",
+        "decision": "Keep"
+      }
+    ]
+  },
+  {
+    "id": "campaign-agency",
+    "name": "Agency Campaign",
+    "instances": [
+      "ai-guy"
+    ],
+    "optional": true,
+    "screen": "none",
+    "instructions": "Frontend agency partnerships; backend lead generation and profit sharing.\nPreserve fleet pause and all source holds. Draft and research only until a specific release. Dream work is briefs only; Outflo is replies only. Never revive missing routine prompts. Never bypass sole-writer adapters. Do not start helper agents.",
+    "sources": [
+      {
+        "id": "04aa90b1-cf4e-49dc-90f4-fd0d99205e4f",
+        "name": "Agency Campaign Manager",
+        "decision": "Charter instance"
+      }
+    ]
+  },
+  {
+    "id": "dream-partners",
+    "name": "Dream Partners",
+    "instances": [
+      "revenue-partners"
+    ],
+    "optional": false,
+    "screen": "none",
+    "instructions": "Dream 100 whales and Dream 500 tier 2/nurture; briefs only per working playbook.\nPreserve fleet pause and all source holds. Draft and research only until a specific release. Dream work is briefs only; Outflo is replies only. Never revive missing routine prompts. Never bypass sole-writer adapters. Do not start helper agents.",
+    "sources": [
+      {
+        "id": "505d247a-ec4e-4cd7-aa0f-33ea2db1bfad",
+        "name": "Dream 100",
+        "decision": "Keep two queues"
+      }
+    ]
+  },
+  {
+    "id": "campaign-francois",
+    "name": "Francois Campaign",
+    "instances": [
+      "ai-guy"
+    ],
+    "optional": true,
+    "screen": "none",
+    "instructions": "Isolated client offer and sending assets; event skills only when needed.\nPreserve fleet pause and all source holds. Draft and research only until a specific release. Dream work is briefs only; Outflo is replies only. Never revive missing routine prompts. Never bypass sole-writer adapters. Do not start helper agents.",
+    "sources": [
+      {
+        "id": "2bb02a3e-540e-4b34-92b0-2f6d4d776f11",
+        "name": "Francois Campaign Manager",
+        "decision": "Charter instance"
+      }
+    ]
+  },
+  {
+    "id": "campaign-home-services",
+    "name": "Home Services Campaign",
+    "instances": [
+      "ai-guy"
+    ],
+    "optional": true,
+    "screen": "none",
+    "instructions": "Mastermind then Revenue Partnerships; explicit transition and cooldown policy.\nPreserve fleet pause and all source holds. Draft and research only until a specific release. Dream work is briefs only; Outflo is replies only. Never revive missing routine prompts. Never bypass sole-writer adapters. Do not start helper agents.",
+    "sources": [
+      {
+        "id": "19be9fa7-45fc-4470-8b6e-777d61d11656",
+        "name": "Home Services Campaign Manager",
+        "decision": "Charter instance"
+      }
+    ]
+  },
+  {
+    "id": "campaign-influencer",
+    "name": "Influencer Campaign",
+    "instances": [
+      "ai-guy"
+    ],
+    "optional": true,
+    "screen": "none",
+    "instructions": "IG/YT creator monetization; proof assets and ICP remain unresolved.\nPreserve fleet pause and all source holds. Draft and research only until a specific release. Dream work is briefs only; Outflo is replies only. Never revive missing routine prompts. Never bypass sole-writer adapters. Do not start helper agents.",
+    "sources": [
+      {
+        "id": "3c7161bc-edbe-41be-971d-811b0396b58c",
+        "name": "Influencer Campaign Manager",
+        "decision": "Charter instance"
+      }
+    ]
+  },
+  {
+    "id": "campaign-revpartners",
+    "name": "Revpartners Campaign",
+    "instances": [
+      "revenue-partners"
+    ],
+    "optional": false,
+    "screen": "none",
+    "instructions": "Niche charters plus Mens Health flagship waterfall; prevent dual-active enrollment.\nPreserve fleet pause and all source holds. Draft and research only until a specific release. Dream work is briefs only; Outflo is replies only. Never revive missing routine prompts. Never bypass sole-writer adapters. Do not start helper agents.",
+    "sources": [
+      {
+        "id": "e4e8e58f-38bc-421c-86b3-386e0711bef9",
+        "name": "Revenue Partnerships Campaign Manager",
+        "decision": "Charter instance"
+      }
+    ]
+  },
+  {
+    "id": "linkedin",
+    "name": "LinkedIn",
+    "instances": [
+      "revenue-partners"
+    ],
+    "optional": true,
+    "screen": "optional",
+    "instructions": "Unipile Engage/Inbox; controlled browser seat, approved touches only.\nReplies-only per latest fleet doctrine; preserve owner-managed campaign changes.\nPreserve fleet pause and all source holds. Draft and research only until a specific release. Dream work is briefs only; Outflo is replies only. Never revive missing routine prompts. Never bypass sole-writer adapters. Do not start helper agents.",
+    "sources": [
+      {
+        "id": "b5f31c99-1fcb-469f-b2b4-18e66a546bf3",
+        "name": "LinkedIn Operator",
+        "decision": "Keep"
+      },
+      {
+        "id": "cb6e468a-63d8-4afe-9c58-c027a761f0ed",
+        "name": "Outflo Operator",
+        "decision": "Merge capability"
+      }
+    ]
+  },
+  {
+    "id": "newsletter-flagship",
+    "name": "Newsletter Flagship",
+    "instances": [
+      "ai-guy"
+    ],
+    "optional": true,
+    "screen": "none",
+    "instructions": "Flagship opt-in publication; Justin ideas and explicit issue release.\nPreserve fleet pause and all source holds. Draft and research only until a specific release. Dream work is briefs only; Outflo is replies only. Never revive missing routine prompts. Never bypass sole-writer adapters. Do not start helper agents.",
+    "sources": [
+      {
+        "id": "b7b825a5-33f9-4f08-b559-d7a677c0ed5d",
+        "name": "Beehiiv Newsletter Creator",
+        "decision": "Keep optional"
+      }
+    ]
+  },
+  {
+    "id": "newsletter-smtp",
+    "name": "Newsletter SMTP",
+    "instances": [
+      "ai-guy"
+    ],
+    "optional": true,
+    "screen": "none",
+    "instructions": "Listmonk/SMTP staging, throttle and transport hygiene; isolated from Instantly.\nPreserve fleet pause and all source holds. Draft and research only until a specific release. Dream work is briefs only; Outflo is replies only. Never revive missing routine prompts. Never bypass sole-writer adapters. Do not start helper agents.",
+    "sources": [
+      {
+        "id": "8e37f229-8964-4f7b-b4bd-8534226750c6",
+        "name": "SMTP Newsletter Operator",
+        "decision": "Keep tier 2"
+      }
+    ]
+  }
+]

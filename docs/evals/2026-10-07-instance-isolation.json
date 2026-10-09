@@ -1,0 +1,288 @@
+{
+  "date": "2026-10-08T02:20:57.611Z",
+  "cases": [
+    {
+      "name": "Current Bops health identity",
+      "result": "pass",
+      "ms": 24
+    },
+    {
+      "name": "Current Bops picker identities",
+      "result": "pass",
+      "ms": 21
+    },
+    {
+      "name": "Current Bops persisted state ownership",
+      "result": "pass",
+      "ms": 6
+    },
+    {
+      "name": "Current Bops sign-in availability",
+      "result": "pass",
+      "ms": 5
+    },
+    {
+      "name": "Current Bops cross-instance origin rejection",
+      "result": "pass",
+      "ms": 5
+    },
+    {
+      "name": "AI Guy Go To Market health identity",
+      "result": "pass",
+      "ms": 6
+    },
+    {
+      "name": "AI Guy Go To Market picker identities",
+      "result": "pass",
+      "ms": 41
+    },
+    {
+      "name": "AI Guy Go To Market persisted state ownership",
+      "result": "pass",
+      "ms": 143
+    },
+    {
+      "name": "AI Guy Go To Market sign-in availability",
+      "result": "pass",
+      "ms": 3
+    },
+    {
+      "name": "AI Guy Go To Market cross-instance origin rejection",
+      "result": "pass",
+      "ms": 4
+    },
+    {
+      "name": "Revenue Partners health identity",
+      "result": "pass",
+      "ms": 7
+    },
+    {
+      "name": "Revenue Partners picker identities",
+      "result": "pass",
+      "ms": 15
+    },
+    {
+      "name": "Revenue Partners persisted state ownership",
+      "result": "pass",
+      "ms": 5
+    },
+    {
+      "name": "Revenue Partners sign-in availability",
+      "result": "pass",
+      "ms": 14
+    },
+    {
+      "name": "Revenue Partners cross-instance origin rejection",
+      "result": "pass",
+      "ms": 4
+    },
+    {
+      "name": "AI Guy Go To Market borrowed computer read",
+      "result": "pass",
+      "ms": 391
+    },
+    {
+      "name": "AI Guy Go To Market live desktop JPEG",
+      "result": "pass",
+      "ms": 782
+    },
+    {
+      "name": "AI Guy Go To Market no implicit computer setup",
+      "result": "pass",
+      "ms": 3
+    },
+    {
+      "name": "AI Guy Go To Market binding change refusal",
+      "result": "pass",
+      "ms": 8
+    },
+    {
+      "name": "AI Guy Go To Market private business integrations",
+      "result": "pass",
+      "ms": 0
+    },
+    {
+      "name": "Revenue Partners borrowed computer read",
+      "result": "pass",
+      "ms": 459
+    },
+    {
+      "name": "Revenue Partners live desktop JPEG",
+      "result": "pass",
+      "ms": 1340
+    },
+    {
+      "name": "Revenue Partners no implicit computer setup",
+      "result": "pass",
+      "ms": 5
+    },
+    {
+      "name": "Revenue Partners binding change refusal",
+      "result": "pass",
+      "ms": 8
+    },
+    {
+      "name": "Revenue Partners private business integrations",
+      "result": "pass",
+      "ms": 0
+    },
+    {
+      "name": "profile edits remain isolated and restore correctly",
+      "result": "pass",
+      "ms": 20
+    }
+  ],
+  "baseline": {
+    "date": "2026-10-08T02:07:51.225Z",
+    "cases": [
+      {
+        "name": "Current Bops health identity",
+        "result": "pass",
+        "ms": 24
+      },
+      {
+        "name": "Current Bops picker identities",
+        "result": "pass",
+        "ms": 18
+      },
+      {
+        "name": "Current Bops persisted state ownership",
+        "result": "pass",
+        "ms": 3
+      },
+      {
+        "name": "Current Bops sign-in availability",
+        "result": "pass",
+        "ms": 5
+      },
+      {
+        "name": "Current Bops cross-instance origin rejection",
+        "result": "pass",
+        "ms": 4
+      },
+      {
+        "name": "AI Guy Go To Market health identity",
+        "result": "pass",
+        "ms": 5
+      },
+      {
+        "name": "AI Guy Go To Market picker identities",
+        "result": "pass",
+        "ms": 17
+      },
+      {
+        "name": "AI Guy Go To Market persisted state ownership",
+        "result": "pass",
+        "ms": 307
+      },
+      {
+        "name": "AI Guy Go To Market sign-in availability",
+        "result": "pass",
+        "ms": 369
+      },
+      {
+        "name": "AI Guy Go To Market cross-instance origin rejection",
+        "result": "pass",
+        "ms": 6
+      },
+      {
+        "name": "Revenue Partners health identity",
+        "result": "pass",
+        "ms": 7
+      },
+      {
+        "name": "Revenue Partners picker identities",
+        "result": "pass",
+        "ms": 31
+      },
+      {
+        "name": "Revenue Partners persisted state ownership",
+        "result": "pass",
+        "ms": 9
+      },
+      {
+        "name": "Revenue Partners sign-in availability",
+        "result": "pass",
+        "ms": 3
+      },
+      {
+        "name": "Revenue Partners cross-instance origin rejection",
+        "result": "pass",
+        "ms": 4
+      },
+      {
+        "name": "AI Guy Go To Market borrowed computer read",
+        "result": "fail",
+        "ms": 337,
+        "error": "Expected values to be strictly equal:\n\n502 !== 200\n"
+      },
+      {
+        "name": "AI Guy Go To Market no implicit computer setup",
+        "result": "pass",
+        "ms": 9
+      },
+      {
+        "name": "AI Guy Go To Market binding change refusal",
+        "result": "pass",
+        "ms": 12
+      },
+      {
+        "name": "AI Guy Go To Market private business integrations",
+        "result": "pass",
+        "ms": 4
+      },
+      {
+        "name": "Revenue Partners borrowed computer read",
+        "result": "fail",
+        "ms": 298,
+        "error": "Expected values to be strictly equal:\n\n502 !== 200\n"
+      },
+      {
+        "name": "Revenue Partners no implicit computer setup",
+        "result": "pass",
+        "ms": 6
+      },
+      {
+        "name": "Revenue Partners binding change refusal",
+        "result": "pass",
+        "ms": 7
+      },
+      {
+        "name": "Revenue Partners private business integrations",
+        "result": "pass",
+        "ms": 3
+      },
+      {
+        "name": "profile edits remain isolated and restore correctly",
+        "result": "pass",
+        "ms": 29
+      }
+    ]
+  },
+  "scope": "Local coordinators; no remote shell mutation, campaign activation, contact import or outbound execution.",
+  "browser": {
+    "result": "pass",
+    "checks": [
+      "Revenue Partners unsent draft restored after switching to AI Guy and back",
+      "AI Guy unsent draft restored after switching to Revenue Partners and back",
+      "AI Guy desktop image loaded",
+      "Verification drafts cleared without sending messages"
+    ]
+  },
+  "packaging": {
+    "result": "pass",
+    "excluded": [
+      ".data",
+      ".env",
+      ".env.local",
+      ".git",
+      "cloud",
+      "test"
+    ],
+    "checked": [
+      "standalone build",
+      "built native app",
+      "installed native app"
+    ]
+  }
+}
