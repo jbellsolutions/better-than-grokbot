@@ -1,12 +1,15 @@
-import { runBusinessSession } from "./business-runtime";
+import { runBusinessSession, cancelHermesSession } from "./business-runtime";
 import { modelFor } from "./models";
 import "server-only";
 import { execFile } from "node:child_process";
 import { openaiClient, openRouterOn } from "./openai-client";
+import { connectedTools, toolConnections } from "./custom-tools";
+import { teamTools, deliverDelegationResult } from "./team-tools";
 import { runOpenRouter } from "./openrouter-agent";
+import { noteTaskStep } from "./turn-events";
 import type { ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { BLOCKER_LABEL, botChatId, DISPLAYS, live, MAX_SCREENS, workBot, workspaceOf, type Bot, type Effort, type Session } from "@/lib/types";
 import { creditsOut, executorKey, noteOutOfCredit, OUT_OF_CREDIT, outOfCreditError } from "./cloud";
@@ -29,6 +32,9 @@ import { emailResult } from "./mail";
 import { textResult } from "./phone";
 import { channelResult } from "./channels";
 import { codex } from "./codex";
+import { macAccessAllowed } from "./mac-access";
+import { instructionsFor } from "./business-profiles";
+import { bindMacWorker, claimMac, releaseMac } from "./mac-capacity";
 import { chooseWhere, MAC_WORDS } from "./where";
 import { addMessage, bot, getState, id, ownerLine, ownerName, patchSession, session, stateEpoch, update } from "./store";
 import { recordTokens } from "./usage";
@@ -123,12 +129,13 @@ function foldInto(s: Session, goal: string, where: "mac" | "cloud" | "auto"): Se
 }
 
 export function startSession({ botId, goal, title, chatId, sentVia = "you", onWatch, where = "auto", thenOnMac, fresh, taskMode }: StartOptions): Session {
+  const requestedMac = !onWatch && (where === "mac" || where === "auto" && (MAC_WORDS.test(goal) || bot(botId)?.runsOn === "mac"));
   // One job, one thread: asking for a job that's already running (or waiting on the user) adds to it.
   const same = !fresh && !onWatch ? sameJob(botId, title?.trim() || goal.slice(0, 48)) : undefined;
   if (same && !(same.runtime === "hermes" && (same.taskMode ?? "headless") !== (taskMode ?? "headless"))) return foldInto(same, goal, where);
   const s: Session = {
     id: id("ses"),
-    ...(process.env.BOPS_BUSINESS_RUNTIME === "hermes" ? { runtime: "hermes" as const, taskMode: taskMode ?? "headless" as const } : {}),
+    ...(process.env.BOPS_BUSINESS_RUNTIME === "hermes" && !requestedMac ? { runtime: "hermes" as const, taskMode: taskMode ?? "headless" as const } : {}),
     botId,
     chatId: chatId ?? botChatId(botId),
     sentVia,
@@ -148,7 +155,7 @@ export function startSession({ botId, goal, title, chatId, sentVia = "you", onWa
   update((state) => state.sessions.push(s));
   retireCopies(s);
   if (s.runtime === "hermes") { patchSession(s.id, { routing: false, runsOn: "cloud" }); void pump(); }
-  else if (s.routing) void route(s.id, where);
+  else if (s.routing) void route(s.id, requestedMac ? "mac" : where);
   else void pump();
   return s;
 }
@@ -234,18 +241,18 @@ export function moveToMac(sessionId: string, also?: string) {
 /** Stop a session: a queued one never starts; a running one ends its turn and frees its screen. */
 export function stopSession(sessionId: string, reason = "Stopped by you") {
   const s = session(sessionId);
-  if (!s || !live(s)) return;
+  if (!s || (!live(s) && !s.hermesHelpId && !s.codexTurn && !s.macPending)) return;
   stopped.add(sessionId);
-  if (s.status === "queued") patchSession(sessionId, { status: "failed", error: reason, endedAt: Date.now() });
+  if (s.status === "queued" || s.hermesHelpId) patchSession(sessionId, { status: "failed", error: reason, endedAt: Date.now(), blocker: undefined, waitingOnYou: false });
   interrupts.get(sessionId)?.();
-  if (s.runtime === "hermes" && s.hermesTurn) void orgo.hermes({ action: "cancel", turn: s.hermesTurn }).catch(() => {});
+  if (s.runtime === "hermes" && s.hermesTurn) void cancelHermesSession(s.id).catch(() => {});
   // On the user's Mac, Codex can always be told directly (the ids are saved on the thread).
   if (s.runsOn === "mac" && s.codexThread && s.codexTurn) void codex.request("turn/interrupt", { threadId: s.codexThread, turnId: s.codexTurn }).catch(() => {});
 }
 
 /** Stop every task that's queued or running (a reset, or a hosted server about to swap in another user's state). */
 export function stopAllSessions(reason: string) {
-  for (const s of getState().sessions.filter(live)) stopSession(s.id, reason);
+  for (const s of getState().sessions.filter(s => live(s) || !!s.hermesHelpId || !!s.codexTurn || !!s.macPending)) stopSession(s.id, reason);
 }
 
 /**
@@ -258,7 +265,7 @@ export function replyToSession(sessionId: string, text: string, note?: string) {
   patchSession(sessionId, (x) => {
     x.replies.push({ id: id("rep"), role: "user", text, at: Date.now(), delivered: false, note });
   });
-  if (!live(s)) {
+  if (!live(s) && !s.hermesHelpId) {
     stopped.delete(sessionId);
     patchSession(sessionId, { status: "queued", error: undefined, endedAt: undefined });
     void pump();
@@ -273,6 +280,7 @@ const notBefore = new Map<string, number>();
 /** Give queued sessions a screen, oldest first. A bot holds at most 4 screens. */
 const businessRunning = new Set<string>();
 let pumping = false;
+let macWake: ReturnType<typeof setTimeout> | undefined;
 export function resumeBusinessSessions() {
   if (process.env.BOPS_BUSINESS_RUNTIME === "hermes") void pump();
 }
@@ -295,15 +303,23 @@ async function pump() {
         void runBusinessSession(s.id, controller.signal).finally(() => { businessRunning.delete(s.id); interrupts.delete(s.id); void pump(); });
         continue;
       }
-      if ((s.runsOn !== "mac" && process.env.BOPS_COMPUTER_OBSERVE_ONLY === "1") || (s.runsOn === "mac" && process.env.BOPS_DISABLE_MAC === "1")) {
+      if (s.runsOn === "mac" && !macAccessAllowed()) {
+        patchSession(s.id, { status: "failed", endedAt: Date.now(), error: "Allow this computer to use your Mac first." });
+        continue;
+      }
+      if (s.runsOn !== "mac" && process.env.BOPS_COMPUTER_OBSERVE_ONLY === "1") {
         patchSession(s.id, { status: "failed", endedAt: Date.now(), error: "Computer automation is paused in this instance while Hermes owns the computer. Your conversation is saved; viewing and chat remain available." });
         continue;
       }
       // On the user's Mac: no screens to share out, a few at a time (Codex works in the background).
       if (s.runsOn === "mac") {
-        if (getState().sessions.filter((x) => x.runsOn === "mac" && (x.status === "starting" || x.status === "running")).length >= MAX_MAC) continue;
-        patchSession(s.id, { status: "starting", startedAt: s.startedAt ?? Date.now() });
-        void runMac(s.id).finally(() => void pump());
+        if (claimMac(s.id) === null) {
+          if (s.queueReason !== "Mac is busy across computer instances") patchSession(s.id, { queueReason: "Mac is busy across computer instances" });
+          macWake ??= setTimeout(() => { macWake = undefined; void pump(); }, 1000);
+          continue;
+        }
+        patchSession(s.id, { status: "starting", startedAt: s.startedAt ?? Date.now(), queueReason: undefined });
+        void runMac(s.id).finally(() => { if (!session(s.id)?.codexTurn && !session(s.id)?.macPending) releaseMac(s.id); void pump(); });
         continue;
       }
       if (s.host === "orgo") {
@@ -608,6 +624,7 @@ const step = (sessionId: string, tool: string, detail: string, by?: { who?: stri
   patchSession(sessionId, (s) => {
     s.steps.push({ at: Date.now(), tool, detail, ...(by?.who ? { who: by.who } : {}), ...(by?.screen ? { screen: by.screen } : {}) });
   });
+  noteTaskStep(sessionId, tool, detail);
   if (tool !== "setup") captionSoon(sessionId);
 };
 
@@ -897,18 +914,20 @@ async function run(sessionId: string) {
       const timeout = setTimeout(() => controller.abort(new Error("Task exceeded ten minutes")), TURN_TIMEOUT_MS);
       patchSession(sessionId, { status: "running", activity: "getting started" });
       try {
+        const effort = await threadEffort(b.effort, s.goal);
+        patchSession(sessionId, { effort });
         const memory = await memoryBlock(wsOf(s.botId), s.goal, 3000);
         let input: string | undefined = s.answer ? takeReplies(sessionId) : s.goal;
         while (input) {
           const answer = await runOpenRouter({
-            sessionId, botId: b.id, computerId, display, signal: controller.signal,
+            sessionId, botId: b.id, computerId, display, signal: controller.signal, effort,
             instructions: [instructions(b.name, b.role, false, display), appsNote(b, "task"), placesNote(b, "task"), memory].filter(Boolean).join("\n\n"),
             input,
-            appTools: APP_TOOLS(b).map((t) => ({ name: t.name, description: t.description, parameters: t.parameters,
-              run: (args) => t.name === "find_app_actions"
+            appTools: [...await connectedTools(b.id), ...teamTools(b.id, s.chatId, s.id), ...APP_TOOLS(b).map((t) => ({ name: t.name, description: t.description, parameters: t.parameters,
+              run: (args: Record<string, unknown>) => t.name === "find_app_actions"
                 ? findAppActions(b.id, String(args.query ?? ""))
                 : runAppAction(b.id, String(args.action ?? ""), (args.arguments ?? {}) as Record<string, unknown>, { sessionId }, undefined, typeof args.account === "string" ? args.account : undefined),
-            })),
+            }))],
             activity: (activity) => patchSession(sessionId, { activity }),
             step: (kind, text) => step(sessionId, kind, text),
           });
@@ -1024,6 +1043,7 @@ async function run(sessionId: string) {
     const done = session(sessionId)!;
     rememberTask(done);
     patchSession(sessionId, { status: "done", endedAt: Date.now(), activity: undefined });
+    deliverDelegationResult(sessionId);
     const result = addMessage({ chatId: done.chatId, role: "bot", botId: b.id, text: done.answer ?? "Done.", sessionIds: [sessionId], resultOf: sessionId });
     // Worth a chime? Only what the user is waiting on, or needs them (Jev, given what they're doing).
     pingIfWorthIt(result.id, done.title, done.answer ?? "Done.");
@@ -1044,6 +1064,7 @@ async function run(sessionId: string) {
     const error = stopped.has(sessionId) ? (getState().takeover?.sessionId === sessionId ? "Paused while you took over" : "Stopped by you") : credit ? OUT_OF_CREDIT : (e as Error).message;
     patchSession(sessionId, { status: "failed", error, endedAt: Date.now() });
     // Out of AI credit: said once, plainly, in the chat only (never by email, text or a channel).
+    deliverDelegationResult(sessionId);
     if (credit) addMessage({ chatId: s.chatId, role: "bot", botId: b.id, text: OUT_OF_CREDIT, sessionIds: [sessionId], resultOf: sessionId });
     else if (!stopped.has(sessionId)) {
       const failed = addMessage({ chatId: s.chatId, role: "bot", botId: b.id, text: `I couldn't finish ${s.title}: ${error}`, sessionIds: [sessionId], resultOf: sessionId });
@@ -1073,7 +1094,6 @@ async function run(sessionId: string) {
 
 /** The user's replies not yet sent to the agent, joined into one turn. */
 /** Threads that can work on the user's Mac at once (Codex works in the background, in parallel). */
-const MAX_MAC = 3;
 
 /** How a bot works on the user's Mac: the instructions every Mac thread starts with. */
 function macInstructions(botName: string, role: string) {
@@ -1134,12 +1154,15 @@ async function runMac(sessionId: string) {
   let threadId = s.codexThread;
   const unwatchApps = watchFrontApp(sessionId);
   try {
+    if (!macAccessAllowed()) throw Error("Allow this computer to use your Mac first.");
+    mkdirSync(WORKSPACE, { recursive: true, mode: 0o700 });
     // Out of AI credit: it doesn't start (the chat shows that, with Upgrade).
     if (await creditsOut()) throw outOfCreditError();
     step(sessionId, "setup", "Getting ready on your Mac");
     await codex.ready();
+    if (codex.processId) bindMacWorker(s.id, codex.processId);
     // The bot's apps come through Bops (vm/apps-mcp.mjs), with only the access the user gave it.
-    const apps = composioOn() && accountsOf(b).length
+    const apps = (composioOn() && accountsOf(b).length) || toolConnections(b.id).length || teamTools(b.id, s.chatId, s.id).length
       ? {
           mcp_servers: {
             bops_apps: {
@@ -1157,7 +1180,7 @@ async function runMac(sessionId: string) {
       approvalsReviewer: "user",
       sandbox: "read-only",
       cwd: WORKSPACE,
-      developerInstructions: [macInstructions(b.name, b.isMain ? `chief of staff; ${b.role}` : b.role), appsNote(b, "task", { tools: !!apps }), placesNote(b, "task"), memory].filter(Boolean).join("\n\n"),
+      developerInstructions: [macInstructions(b.name, b.isMain ? `chief of staff; ${b.role}` : b.role), instructionsFor(b), "Build software in the project workspace and request file or command approvals when needed. Use available team tools to coordinate; never grant yourself permissions. Report actual output paths and validation results.", appsNote(b, "task", { tools: !!apps }), placesNote(b, "task"), memory].filter(Boolean).join("\n\n"),
       ...(apps ? { config: apps } : {}),
     };
     if (threadId) await codex.request("thread/resume", { threadId, ...settings }).catch(() => (threadId = undefined));
@@ -1189,6 +1212,7 @@ async function runMac(sessionId: string) {
     const done = session(sessionId)!;
     rememberTask(done);
     patchSession(sessionId, { status: "done", endedAt: Date.now(), activity: undefined, codexTurn: undefined });
+    deliverDelegationResult(sessionId);
     const result = addMessage({ chatId: done.chatId, role: "bot", botId: b.id, text: done.answer ?? "Done.", sessionIds: [sessionId], resultOf: sessionId });
     // Worth a chime? Only what the user is waiting on, or needs them (Jev, given what they're doing).
     pingIfWorthIt(result.id, done.title, done.answer ?? "Done.");
@@ -1198,7 +1222,8 @@ async function runMac(sessionId: string) {
   } catch (e) {
     const credit = !stopped.has(sessionId) && noteOutOfCredit(e);
     const error = stopped.has(sessionId) ? "Stopped by you" : credit ? OUT_OF_CREDIT : (e as Error).message;
-    patchSession(sessionId, { status: "failed", error, endedAt: Date.now(), activity: undefined, codexTurn: undefined });
+    patchSession(sessionId, { status: "failed", error, endedAt: Date.now(), activity: undefined });
+    deliverDelegationResult(sessionId);
     if (credit) addMessage({ chatId: s.chatId, role: "bot", botId: b.id, text: OUT_OF_CREDIT, sessionIds: [sessionId], resultOf: sessionId });
     else if (!stopped.has(sessionId)) {
       const failed = addMessage({ chatId: s.chatId, role: "bot", botId: b.id, text: `I couldn't finish ${s.title} on your Mac: ${error}`, sessionIds: [sessionId], resultOf: sessionId });
@@ -1209,7 +1234,7 @@ async function runMac(sessionId: string) {
   } finally {
     unwatchApps();
     interrupts.delete(sessionId);
-    if (threadId) codex.off(threadId);
+    if (threadId && !session(sessionId)?.codexTurn && !session(sessionId)?.macPending) codex.off(threadId);
   }
 }
 
@@ -1218,10 +1243,19 @@ function macTurn(sessionId: string, threadId: string, input: string) {
   return new Promise<string>((resolve, reject) => {
     let last = "";
     let turnId: string | undefined;
+    let settled = false, terminal = false;
+    patchSession(sessionId, { macPending: true });
     const timer = setTimeout(() => finish(new Error("Codex took too long on this step")), TURN_TIMEOUT_MS);
-    const finish = (err?: Error) => {
+    const finish = (err?: Error, confirmed = false) => {
       clearTimeout(timer);
-      codex.off(threadId);
+      if (confirmed) {
+        terminal = true;
+        patchSession(sessionId, { codexTurn: undefined, macPending: false, ...(settled && stopped.has(sessionId) && err?.message === "Stopped by you" ? { error: "Stopped by you" } : {}) });
+        codex.off(threadId);
+        if (settled) { releaseMac(sessionId); void pump(); return; }
+      } else if (err && turnId) void codex.request("turn/interrupt", { threadId, turnId }).catch(() => {});
+      if (settled) return;
+      settled = true;
       if (err) return reject(err);
       patchSession(sessionId, (x) => {
         const end = x.steps.at(-1);
@@ -1250,9 +1284,9 @@ function macTurn(sessionId: string, threadId: string, input: string) {
         last = item.text;
       } else if (m.method === "turn/completed") {
         const turn = (m.params as { turn?: { status?: string; error?: { message?: string } } })?.turn;
-        if (turn?.status === "failed") finish(new Error(turn.error?.message ?? "Codex couldn't finish"));
-        else if (turn?.status === "interrupted") finish(new Error("Stopped by you"));
-        else finish();
+        if (turn?.status === "failed") finish(new Error(turn.error?.message ?? "Codex couldn't finish"), true);
+        else if (turn?.status === "interrupted") finish(new Error("Stopped by you"), true);
+        else finish(undefined, true);
       } else if (m.method === "error") {
         const msg = (m.params as { error?: { message?: string } })?.error?.message;
         if (msg && !(m.params as { willRetry?: boolean })?.willRetry) finish(new Error(msg));
@@ -1261,14 +1295,15 @@ function macTurn(sessionId: string, threadId: string, input: string) {
     codex
       .request<{ turn: { id: string } }>("turn/start", { threadId, input: [{ type: "text", text: input }] })
       .then((r) => {
+        if (terminal) return;
         turnId = r.turn.id;
-        patchSession(sessionId, { codexTurn: turnId });
+        patchSession(sessionId, { codexTurn: turnId, macPending: false });
         const stop = () => void codex.request("turn/interrupt", { threadId, turnId }).catch(() => {});
         interrupts.set(sessionId, stop);
         // Stopped while the turn was starting: stop it now.
-        if (stopped.has(sessionId)) stop();
+        if (stopped.has(sessionId) || settled) stop();
       })
-      .catch((e: Error) => finish(e));
+      .catch((e: Error & { rpcRejected?: boolean }) => finish(e, !!e.rpcRejected));
   });
 }
 

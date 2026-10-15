@@ -7,7 +7,7 @@ const ts = require('typescript');
 function desktop() {
   const source = ts.createSourceFile('main.cjs', fs.readFileSync('desktop/main.cjs', 'utf8'), ts.ScriptTarget.Latest, true);
   const statement = source.statements.find(n => n.getText(source).startsWith('ipcMain.handle("instance-select"'));
-  const entries = ['default', 'ai-guy', 'revenue-partners'].map((id, i) => ({ id, url: `http://localhost:${3210 + i}` }));
+  const entries = ['default', 'team-a', 'team-b'].map((id, i) => ({ id, url: `http://localhost:${3210 + i}` }));
   const windows = new Map();
   const created = [];
   let handler;
@@ -25,24 +25,24 @@ function desktop() {
 test('native switching returns to the same window and draft without restarting either instance', async () => {
   const d = desktop();
   const original = d.windows.get('default');
-  await d.handler(d.event('default'), 'ai-guy');
-  const ai = d.windows.get('ai-guy');
+  await d.handler(d.event('default'), 'team-a');
+  const ai = d.windows.get('team-a');
   assert.equal(original.hidden, true); assert.equal(ai.hidden, false);
   ai.draft = 'A business-specific draft';
-  await d.handler(d.event('ai-guy'), 'revenue-partners');
+  await d.handler(d.event('team-a'), 'team-b');
   assert.equal(ai.hidden, true);
-  await d.handler(d.event('revenue-partners'), 'ai-guy');
-  assert.equal(d.windows.get('ai-guy'), ai);
+  await d.handler(d.event('team-b'), 'team-a');
+  assert.equal(d.windows.get('team-a'), ai);
   assert.equal(ai.draft, 'A business-specific draft');
-  await d.handler(d.event('ai-guy'), 'default');
+  await d.handler(d.event('team-a'), 'default');
   assert.equal(d.windows.get('default'), original);
   assert.equal(original.hidden, false);
-  assert.deepEqual(d.created, ['ai-guy', 'revenue-partners']);
+  assert.deepEqual(d.created, ['team-a', 'team-b']);
 });
 
 test('offline or mismatched native targets leave the current window visible', async () => {
   const d = desktop(); d.fail(new Error('Wrong instance identity'));
-  await assert.rejects(d.handler(d.event('default'), 'ai-guy'), /Wrong instance/);
+  await assert.rejects(d.handler(d.event('default'), 'team-a'), /Wrong instance/);
   assert.equal(d.windows.get('default').hidden, false);
   assert.equal(d.created.length, 0);
 });
@@ -50,6 +50,6 @@ test('offline or mismatched native targets leave the current window visible', as
 test('native instance selection rejects unknown IDs and external renderer origins', async () => {
   const d = desktop();
   await assert.rejects(d.handler(d.event('default'), 'other'), /Unknown/);
-  await assert.rejects(d.handler({ sender: { getURL: () => 'https://external.example/' } }, 'ai-guy'), /Unknown/);
+  await assert.rejects(d.handler({ sender: { getURL: () => 'https://external.example/' } }, 'team-a'), /Unknown/);
   assert.equal(d.created.length, 0);
 });

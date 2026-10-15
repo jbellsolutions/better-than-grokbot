@@ -70,19 +70,26 @@ function usePermissions(every: number) {
   const [status, setStatus] = useState<Partial<Record<PermId, PermStatus>> | null>(null);
   const [restart, setRestart] = useState(false);
   const [appName, setAppName] = useState("Better Than GrokBot");
+  const [error, setError] = useState("");
+  const checking = useRef(false);
   const refresh = useCallback(async () => {
     const b = bridge();
-    if (!b?.permissions) return;
+    if (!b?.permissions || checking.current) return;
+    checking.current = true;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
-      setAppName(await b.appName?.() ?? "Better Than GrokBot");
-      setStatus(await b.permissions.status());
-      setRestart(!!(await b.screenNeedsRestart?.()));
-    } catch {
-      /* the next look tries again */
-    }
+      const values = await Promise.race([
+        Promise.all([b.appName?.(), b.permissions.status(), b.screenNeedsRestart?.()]),
+        new Promise<never>((_, reject) => { timeout = setTimeout(() => reject(Error("Permission check unavailable. Try again.")), 5000); }),
+      ]);
+      setAppName(values[0] ?? "Better Than GrokBot"); setStatus(values[1]); setRestart(!!values[2]); setError("");
+    } catch (e) {
+      setStatus({ screen: "unknown", microphone: "unknown", notifications: "unknown", accessibility: "unknown" });
+      setError((e as Error).message);
+    } finally { clearTimeout(timeout); checking.current = false; }
   }, []);
   useWhileOpen(() => void refresh(), every);
-  return { inApp: inApp && !!bridge()?.permissions, status, restart, refresh, appName };
+  return { inApp: inApp && !!bridge()?.permissions, status, restart, refresh, appName, error };
 }
 
 /** Routing through this Mac (GET/POST /api/relay). A server without the route reads as not available. */
@@ -274,7 +281,8 @@ function PermissionCard({ id, items }: { id: "screen" | "microphone" | "notifica
             : "Not asked yet";
   const tone: Tone = s === "granted" && !(id === "screen" && perms.restart) ? "ok" : s === "not-determined" || s === "unknown" ? "off" : "todo";
   return (
-    <Card icon={ICONS[id]} title={copy.title} line={`${copy.line} Permission belongs to ${perms.appName}; enabling the upstream Bops app does not grant it here.`} tone={tone} status={status}>
+    <Card icon={ICONS[id]} title={copy.title} line={`${copy.line} Permission belongs to ${perms.appName}; enabling the upstream Bops app does not grant it here.`} tone={tone} status={perms.error || status}>
+      {perms.error && <button onClick={() => void perms.refresh()} className={light}>Retry check</button>}
       {restart && (
         <button onClick={() => void bridge()?.relaunch?.()} className={s === "granted" ? dark : light}>
           Restart {perms.appName}
@@ -319,10 +327,10 @@ function ComputerUseCard({ items }: { items: Items }) {
   const check = useCallback(async () => {
     if (checking.current) return;
     checking.current = true;
-    await fetch("/api/mac", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ check: true }) }).catch(() => undefined);
+    await fetch("/api/mac", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ check: true }), signal: AbortSignal.timeout(35_000) }).catch(() => setError("Mac check did not finish. Try Check again in Your Mac."));
     checking.current = false;
   }, []);
-  // A fresh look when the card shows (it starts the install if Codex is missing), then while a step waits on the user.
+  // A fresh look when the card shows, then while a step waits on the user.
   useEffect(() => void check(), [check]);
   useWhileOpen(() => {
     const waiting = !!m && !m.ready && (m.next === "sign-in" || m.next === "computer-use");
@@ -343,8 +351,15 @@ function ComputerUseCard({ items }: { items: Items }) {
     setBusy(false);
   };
   const card = { icon: ICONS.computerUse, title: "Computer use on your Mac", line: "Bots use apps on this Mac through Codex. You approve each app the first time. Codex Computer Use has its own Screen Recording and Accessibility permissions, separate from Better Than GrokBot." };
-  if (!m) return <Card {...card} tone="none" status="Checking" />;
+  if (!m) return <Card {...card} tone="none" status={error ?? "Checking"}>{error && <button onClick={() => void check()} className={light}>Retry check</button>}</Card>;
   if (m.ready) return <Card {...card} tone="ok" status={m.plan && m.plan !== "unknown" ? `Ready on your ${planName(m.plan)} plan` : "Ready"} />;
+  if (m.next === "permission") return <Card {...card} tone="todo" status={error ?? m.reason ?? "Allow this computer to use your Mac"}>
+    <button disabled={busy} onClick={async () => {
+      setBusy(true); setError(null);
+      try { const r = await post("/api/mac", { enabled: true }, "PATCH"); if (!r.ok) throw Error((await r.json()).error || "Could not allow Mac access."); }
+      catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+    }} className={dark}>{busy ? "Connecting…" : "Allow this computer"}</button>
+  </Card>;
   if (!m.next || m.next === "elsewhere") return <Card {...card} tone="none" status={m.reason ?? "Checking"} />;
   if (m.installing)
     return (

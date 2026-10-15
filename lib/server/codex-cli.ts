@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { accessSync, constants, createWriteStream } from "node:fs";
 import { chmod, mkdir, mkdtemp, rename, rm } from "node:fs/promises";
 import { homedir } from "node:os";
-import { delimiter, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
@@ -25,7 +25,7 @@ export const binDir = () => join(homedir(), "Library", "Application Support", "B
 
 /** The PATH Codex runs with: the server's, where Codex's installers put it, and Bops' own copy last. */
 export const codexPath = () =>
-  [...new Set([...(process.env.PATH ?? "").split(delimiter), join(homedir(), ".local/bin"), "/usr/local/bin", "/opt/homebrew/bin", binDir()].filter(Boolean))].join(delimiter);
+  [...new Set([...(process.env.PATH ?? "").split(delimiter), dirname(process.execPath), join(homedir(), ".local/bin"), "/usr/local/bin", "/opt/homebrew/bin", binDir()].filter(Boolean))].join(delimiter);
 
 const runnable = (path: string) => {
   try {

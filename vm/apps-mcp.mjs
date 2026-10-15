@@ -49,7 +49,16 @@ createInterface({ input: process.stdin }).on("line", async (line) => {
   if (m.id === undefined) return; // notifications
   if (m.method === "initialize")
     return send({ id: m.id, result: { protocolVersion: m.params?.protocolVersion ?? "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "bops_apps", version: "0.1" } } });
-  if (m.method === "tools/list") return send({ id: m.id, result: { tools } });
+  if (m.method === "tools/list") {
+    try {
+      const r = await call("list_team_tools", {});
+      if (!r.ok) throw Error(r.text);
+      const connected = JSON.parse(r.text).tools;
+      return send({ id: m.id, result: { tools: [...tools, ...connected] } });
+    } catch (e) {
+      return send({ id: m.id, error: { code: -32603, message: `Could not load the agent's tools: ${e.message}` } });
+    }
+  }
   if (m.method === "tools/call") {
     try {
       const r = await call(m.params.name, m.params.arguments ?? {});

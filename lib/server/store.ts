@@ -1,10 +1,13 @@
 import { instanceId, instanceName, instanceComputer } from "./instance";
 import "server-only";
 import { reconcileProfiles } from "./business-profiles";
+import { ensureTeamOperations } from "@/lib/team-operations";
+import { endedMacTasks } from "./mac-capacity";
 import { randomBytes } from "node:crypto";
 import { workspaceOf, MAIN_WORKSPACE, botChatId, type AppState, type Bot, type Chat, type Message, type Session, type Reaction, type Tapback } from "@/lib/types";
 import { fileStore, onPostgres, type Persistence, type StateAccess } from "./persist";
 import { pgStore } from "./persist-pg";
+import { noteSession } from "./turn-events";
 
 /**
  * The app's state: one in-process object, saved behind to .data/state.json on the desktop, or to
@@ -57,6 +60,14 @@ function migrate(raw: Record<string, unknown>): AppState {
   });
 
   reconcileProfiles(state, instanceId());
+  ensureTeamOperations(state);
+  for (const m of state.messages) {
+    if (m.delivery === "queued" || m.delivery === "running") {
+      m.delivery = "failed";
+      m.deliveryError = "The coordinator restarted. Retry this message to continue.";
+    }
+  }
+  const endedMac = endedMacTasks();
   for (const s of state.sessions ?? []) {
     const old = s as Session;
     old.chatId ??= botChatId("sam");
@@ -64,6 +75,7 @@ function migrate(raw: Record<string, unknown>): AppState {
     old.replies ??= [];
     old.title ??= old.goal.slice(0, 48);
     old.host ??= "orgo";
+    if (old.runsOn === "mac" && endedMac.has(old.id)) { old.codexTurn = undefined; old.macPending = false; }
     // Sessions mid-flight when the server stopped can't resume their stream.
     if (old.runtime === "hermes" && (old.status === "queued" || old.status === "starting" || old.status === "running")) {
       old.status = "queued"; old.routing = false; old.display = undefined;
@@ -81,6 +93,10 @@ function migrate(raw: Record<string, unknown>): AppState {
   delete state.samThinking;
   // App approvals wait on a bot that's gone after a restart; a connection mid-sign-in can't finish.
   state.appApprovals = [];
+  if (state.mac) {
+    state.mac.accessEnabled ??= instanceId() === "default" && state.mac.checkedAt !== undefined;
+    state.mac.ready = false; state.mac.reason = "Mac connection needs a fresh check."; state.mac.approvals = [];
+  }
   state.connecting = [];
   // Routing through this Mac is on by default now: a Mac that was paired and then turned off before stays off.
   if (state.relay?.deviceId && !state.relay.on) state.relay.turnedOff ??= true;
@@ -145,7 +161,7 @@ function appAccounts(state: AppState) {
   }
 }
 
-const g = globalThis as unknown as { __bops2?: { state: AppState; version: number; swaps?: number }; __bopsWatchers?: Map<string, () => void> };
+const g = globalThis as unknown as { __bops2?: { state: AppState; version: number; swaps?: number }; __bopsWatchers?: Map<string, () => void>; __bopsListeners?: Set<() => void> };
 const access: StateAccess = {
   get: () => box.state,
   replace(raw) {
@@ -204,6 +220,12 @@ export function ownerLine() {
 export const getVersion = () => box.version;
 
 const watchers = (g.__bopsWatchers ??= new Map());
+const listeners = (g.__bopsListeners ??= new Set());
+/** Live clients unsubscribe on disconnect; unlike named background jobs these are per connection. */
+export function subscribeChanges(listener: () => void) {
+  listeners.add(listener);
+  return () => { listeners.delete(listener); };
+}
 /** Run `fn` after every change (the Bops Cloud backup, lib/server/cloud-state.ts), by name so a code reload replaces it. */
 export const watchChanges = (name: string, fn: () => void) => void watchers.set(name, fn);
 
@@ -211,11 +233,13 @@ export const watchChanges = (name: string, fn: () => void) => void watchers.set(
 function changed() {
   store.changed();
   for (const fn of watchers.values()) fn();
+  for (const fn of listeners) fn();
 }
 
 /** Apply a change, bump the version (clients poll it) and persist (soon, in the background). */
 export function update(fn: (state: AppState) => void) {
   fn(box.state);
+  ensureTeamOperations(box.state);
   box.version++;
   changed();
 }
@@ -232,8 +256,8 @@ export const bot = (botId: string) => box.state.bots.find((b) => b.id === botId)
 export const chat = (chatId: string) => box.state.chats.find((c) => c.id === chatId);
 export const session = (sessionId: string) => box.state.sessions.find((s) => s.id === sessionId);
 
-export function addMessage(m: Omit<Message, "id" | "at">) {
-  const message: Message = { id: id("msg"), at: Date.now(), ...m };
+export function addMessage(m: Omit<Message, "id" | "at">, opts: { id?: string } = {}) {
+  const message: Message = { id: opts.id ?? id("msg"), at: Date.now(), ...m };
   update((s) => {
     // A thread reports into the chat once: its latest result replaces the one before.
     if (m.resultOf) s.messages = s.messages.filter((x) => x.resultOf !== m.resultOf);
@@ -265,22 +289,31 @@ export function setAsking(chatId: string, botId: string, to: string | null) {
   });
 }
 
+const typingCounts = new Map<string, number>();
 export function setTyping(chatId: string, botId: string, on: boolean) {
   update(() => {
     const c = chat(chatId);
     if (!c) return;
+    const key = `${stateEpoch()}:${chatId}:${botId}`;
+    const count = Math.max(0, (typingCounts.get(key) ?? 0) + (on ? 1 : -1));
+    if (count) typingCounts.set(key, count); else typingCounts.delete(key);
     c.typing = c.typing.filter((b) => b !== botId);
-    if (on) c.typing.push(botId);
+    if (count) c.typing.push(botId);
   });
 }
 
 export function patchSession(sessionId: string, patch: Partial<Session> | ((s: Session) => void)) {
+  const out: { changed?: { s: Session; before: Pick<Session, "status" | "activity" | "blocker"> } } = {};
   update(() => {
     const s = session(sessionId);
     if (!s) return;
+    const before = { status: s.status, activity: s.activity, blocker: s.blocker };
     if (typeof patch === "function") patch(s);
     else Object.assign(s, patch);
+    out.changed = { s, before };
   });
+  // Its start, steps and end, for the turn stream (the web chat and Slack watch tasks live).
+  if (out.changed) noteSession(out.changed.s, out.changed.before);
 }
 
 /** Start over: back up the current state, then begin again with the main bot alone (keeps the host setting and who's signed in). */
@@ -293,6 +326,8 @@ export function resetState() {
   const { host, account, usage, relay, cloudUser } = box.state;
   const name = account?.user.name?.slice(0, 80);
   box.state = migrate({ host, account, usage, relay, cloudUser, owner: name ? { name } : undefined });
+  box.swaps = (box.swaps ?? 0) + 1;
+  typingCounts.clear();
   update(() => {});
 }
 

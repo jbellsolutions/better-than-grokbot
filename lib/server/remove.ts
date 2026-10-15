@@ -4,6 +4,7 @@ import { dropGuestKey, resetComputer, stopSession } from "./sessions";
 import { bot, getState, session, update } from "./store";
 import { stopWatch } from "./watches";
 import { deleteInboxes } from "./mail";
+import { deleteAgentTools } from "./custom-tools";
 
 /** Delete one message from a chat. */
 export function deleteMessage(messageId: string) {
@@ -14,7 +15,7 @@ export function deleteMessage(messageId: string) {
 export function deleteThread(sessionId: string) {
   const s = session(sessionId);
   if (!s) return;
-  if (live(s)) throw new Error("stop it first");
+  if (live(s) || s.hermesTurn || s.codexTurn || s.macPending) throw new Error("stop it first");
   update((state) => {
     state.sessions = state.sessions.filter((x) => x.id !== sessionId);
     state.messages = state.messages
@@ -35,7 +36,16 @@ export async function deleteBot(botId: string, withWorkspace = false) {
   const b = bot(botId);
   if (!b) return;
   if (b.isMain && !withWorkspace) throw new Error(`${b.name} runs the team and can't be deleted`);
-  for (const s of getState().sessions.filter((x) => x.botId === botId && live(x))) stopSession(s.id, `Stopped: ${b.name} was deleted`);
+  if (b.teamRole === "operations" && !withWorkspace) throw new Error(`${b.name} is Head of Operations. Assign another agent that role before deleting this one.`);
+  for (const s of getState().sessions.filter((x) => x.botId === botId && (live(x) || !!x.hermesTurn || !!x.codexTurn || !!x.macPending))) {
+    stopSession(s.id, `Stopped: ${b.name} was deleted`);
+    if (s.codexTurn || s.macPending) throw Error(`Wait until ${b.name}'s Mac task is confirmed stopped before deleting it.`);
+    if (s.hermesTurn) {
+      const { cancelHermesSession } = await import("./business-runtime");
+      await cancelHermesSession(s.id);
+      if (s.hermesTurn) throw Error(`Wait until ${b.name}'s private screen is confirmed stopped before deleting it.`);
+    }
+  }
   for (const w of getState().watches?.filter((x) => x.botId === botId) ?? []) await stopWatch(w.id);
   // Its secret on the main bot's computer, if it shared that one, goes too.
   await dropGuestKey(botId);
@@ -43,6 +53,7 @@ export async function deleteBot(botId: string, withWorkspace = false) {
   if (b.computerId && !b.externalComputer && b.computerId !== process.env.BOPS_ORGO_COMPUTER_ID) await resetComputer(botId);
   // Its email inboxes go too (they count against the AgentMail plan).
   await deleteInboxes(b);
+  deleteAgentTools(botId);
   const chatId = botChatId(botId);
   update((state) => {
     if (b.catalogId && !state.removedProfiles?.includes(b.catalogId)) (state.removedProfiles ??= []).push(b.catalogId);

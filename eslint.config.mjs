@@ -21,6 +21,7 @@ const eslintConfig = defineConfig([
     "vendor/**",
     ".scratch/**",
     ".data/**",
+    ".cloudroom/**",
   ]),
 ]);
 

@@ -7,7 +7,7 @@ import { NextResponse, type NextRequest } from "next/server";
  *
  * - A request addressed to another host (a LAN or tailnet address, or a DNS-rebound name) may only
  *   reach the paths the tailnet calls, each of which proves itself (the bot's secret, the webhook
- *   signature): bot computers' app calls and the webhook relay (edge/).
+ *   signature): bot computers' app calls and the webhook relay (edge/: Slack's events and button clicks too).
  * - A request from a web page must come from the app's own origin.
  *
  * The Host header is the caller's to set, so this stops browsers, not a determined caller on the
@@ -20,7 +20,7 @@ import { NextResponse, type NextRequest } from "next/server";
  */
 
 const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"]);
-const TAILNET_PATHS = new Set(["/api/apps/call", "/api/phone/agentphone", "/api/phone/openai", "/api/channels/slack/events"]);
+const TAILNET_PATHS = new Set(["/api/apps/call", "/api/phone/agentphone", "/api/phone/openai", "/api/channels/slack/events", "/api/channels/slack/interactivity"]);
 
 const hostname = (host: string) => host.replace(/:\d+$/, "").toLowerCase();
 

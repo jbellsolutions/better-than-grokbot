@@ -1,8 +1,9 @@
 "use client";
 
 import { ObservedComputer } from "./observed-computer";
+import { workStatus } from "@/lib/work-status";
 import { useEffect, useRef, useState } from "react";
-import { BLOCKER_LABEL, DISPLAYS, live, workBot, workspaceOf, type AppState, type Bot, type Session } from "@/lib/types";
+import { BLOCKER_LABEL, DISPLAYS, live, workBot, workspaceOf, type AppState, type Bot } from "@/lib/types";
 import { freeComputerOpen, setupShort } from "@/lib/orgo-plans";
 import { BotCursor } from "./bot-cursor";
 import { LiveDesktop, Waking } from "./live-desktop";
@@ -1125,9 +1126,10 @@ export function ComputerSummary({ state, bot: b, className = "", onOpen }: { sta
 
 /** With the right panel collapsed: a round button, like the call button, that reopens the bot's computer. */
 export function ComputerPeek({ state, bot: b, onOpen }: { state: AppState; bot: Bot; onOpen: () => void }) {
-  const running = state.sessions.filter((s: Session) => s.botId === b.id && live(s));
-  const needsYou = running.some((s) => s.blocker) || !!state.watches?.some((w) => w.botId === b.id && w.alert);
-  const label = `${b.name}'s computer · ${needsYou ? "needs you" : running.length ? `working on ${running.length} thing${running.length === 1 ? "" : "s"}` : "nothing running"}`;
+  const tasks = state.sessions.filter(s => s.botId === b.id && s.runsOn !== "mac").map(workStatus);
+  const active = tasks.filter(s => ["queued", "starting", "running"].includes(s.kind));
+  const needsYou = tasks.some(s => s.attention) || !!state.watches?.some((w) => w.botId === b.id && w.alert);
+  const label = `${b.name}'s computer · ${needsYou ? tasks.find(s => s.attention)?.text ?? "needs you" : active.length ? active.map(s => s.label).join(", ") : "no active tasks"}`;
   return (
     <button
       onClick={onOpen}
@@ -1136,9 +1138,9 @@ export function ComputerPeek({ state, bot: b, onOpen }: { state: AppState; bot: 
       className="relative flex size-11 items-center justify-center rounded-full bg-white shadow-[0_0_0_1px_#E6E6E3,0_8px_20px_-10px_#00000040] hover:shadow-[0_0_0_1px_#C9C9C6,0_8px_20px_-10px_#00000040]"
     >
       <MonitorIcon size={18} color="#0A0A0A" />
-      {(needsYou || running.length > 0) && (
+      {(needsYou || active.length > 0) && (
         <span
-          className={`absolute right-[7px] top-[7px] size-[9px] rounded-full shadow-[0_0_0_2px_#FFFFFF] ${needsYou ? "bg-highlighter shadow-[0_0_0_1.5px_#0A0A0A]" : "animate-pulse bg-[#2BB673]"}`}
+          className={`absolute right-[7px] top-[7px] size-[9px] rounded-full shadow-[0_0_0_2px_#FFFFFF] ${needsYou ? "bg-highlighter shadow-[0_0_0_1.5px_#0A0A0A]" : active.every(s => s.kind === "queued") ? "bg-[#9A9A98]" : "animate-pulse bg-[#2BB673]"}`}
         />
       )}
     </button>

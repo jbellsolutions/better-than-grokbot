@@ -159,7 +159,46 @@ function TokenSetup({ bot: b, kind }: { bot: Bot; kind: "telegram" | "discord" }
   );
 }
 
-/** Slack: connect the Slack app once (Composio), then pick the channels this bot joins. */
+/**
+ * The user's own Slack app (made from Bops' manifest, slack/setup.mjs): its bot token and signing
+ * secret, pasted once. They go to this Mac's Keychain; its workspace then shows as a Slack account.
+ */
+function SlackAppForm() {
+  const [token, setToken] = useState("");
+  const [secret, setSecret] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const save = async () => {
+    setBusy(true);
+    setError(null);
+    const res = await post("/api/channels/slack/app", { token, signingSecret: secret });
+    const j = (await res.json()) as { error?: string };
+    setBusy(false);
+    if (j.error) setError(j.error);
+    else {
+      setToken("");
+      setSecret("");
+    }
+  };
+  return (
+    <div className="flex flex-col gap-2 border-t border-[#EFEFED] pt-2.5">
+      <span className="text-[12.5px] leading-[18px] text-[#3A3A38]">
+        Or your own Slack app, made from Bops&apos; manifest: paste its Bot User OAuth Token and Signing Secret. With it, bots show their work as they go and approvals have buttons. Every Bops on this Mac uses the same app.
+      </span>
+      <input type="password" autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} placeholder="Bot token (xoxb-…)" className={field} />
+      <input type="password" autoComplete="off" value={secret} onChange={(e) => setSecret(e.target.value)} placeholder="Signing secret" className={field} />
+      <div className="flex items-center gap-2">
+        <button onClick={() => void save()} disabled={busy || !token.trim() || !secret.trim()} className={primary}>
+          {busy ? "Checking…" : "Use this app"}
+        </button>
+        <span className="text-[11.5px] leading-4 text-[#9A9A98]">They stay in your Mac&apos;s Keychain.</span>
+      </div>
+      {error && <span className="text-[12px] leading-4 text-[#B42318]">{error}</span>}
+    </div>
+  );
+}
+
+/** Slack: connect the Slack app once (Composio, or the user's own app's token), then pick the channels this bot joins. */
 function SlackSetup({ state, bot: b }: { state: AppState; bot: Bot }) {
   const accounts = (state.accounts ?? []).filter((a) => a.app === "slackbot" && a.status === "active");
   const waiting = (state.connecting ?? []).find((c) => c.app === "slackbot");
@@ -183,6 +222,7 @@ function SlackSetup({ state, bot: b }: { state: AppState; bot: Bot }) {
           )}
           {waiting?.status === "failed" && <span className="text-[12px] text-[#B42318]">{waiting.error}</span>}
         </div>
+        <SlackAppForm />
       </div>
     );
   return <SlackChannels bot={b} account={account!} accounts={accounts.map((a) => ({ id: a.id, name: a.label ?? a.name ?? "Slack" }))} onAccount={setAccount} />;

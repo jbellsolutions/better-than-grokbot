@@ -2,17 +2,20 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { parseEnv } = require('node:util');
 
+// The team that ships. Separate teams are added to the registry with `node scripts/instances.cjs add`.
 const definitions = [
   { id: 'default', name: 'Current Bops', port: 3210, purpose: 'Your existing team', cdp: 9300 },
-  { id: 'ai-guy', name: 'AI Guy Go To Market', port: 3211, purpose: 'Cold email', cdp: 10300, computerId: 'eed51fbb-8f2e-4b78-8d8f-8aa672b11df5' },
-  { id: 'revenue-partners', name: 'Revenue Partners', port: 3212, purpose: 'Prospecting', cdp: 11300, computerId: '9262e760-6069-4dcf-a96f-6a92321ad352' },
 ];
 const registryFile = root => path.join(root, '.data', 'instances.json');
 function readRegistry(root) {
   if (!fs.existsSync(registryFile(root))) return [{ ...definitions[0], url: 'http://localhost:3210' }];
   const records = JSON.parse(fs.readFileSync(registryFile(root), 'utf8'));
-  const ids = ['default', 'ai-guy', 'revenue-partners', 'chief-sales-officer', 'co-founder'];
-  if (!Array.isArray(records) || records.length < 3 || records.length > ids.length || records.some((r, i) => !r || r.id !== ids[i] || r.port !== 3210 + i || r.url !== `http://localhost:${r.port}`)) throw Error('Invalid Bops instance registry');
+  return validateRegistry(records);
+}
+
+/** Future computers use independent local ports; never accept arbitrary remote endpoints. */
+function validateRegistry(records) {
+  if (!Array.isArray(records) || !records.length || records[0]?.id !== 'default' || new Set(records.map(r => r?.id)).size !== records.length || records.some((r, i) => !r || !/^[a-z][a-z0-9-]{0,39}$/.test(r.id) || r.port !== 3210 + i || r.port > 65535 || r.url !== `http://localhost:${r.port}`)) throw Error('Invalid Bops instance registry');
   return records;
 }
 
@@ -37,7 +40,7 @@ function instanceEnv(root, entry, inherited = process.env) {
     BOPS_DATA_DIR: directory, BOPS_INSTANCE_REGISTRY: registryFile(root),
     BOPS_SELF_HOSTED: '1', BOPS_DATABASE_URL: '', BOPS_ORGO_COMPUTER_ID: entry.computerId,
     BOPS_CDP_PORT_BASE: String(entry.cdp), BOPS_COMPUTER_OBSERVE_ONLY: '1',
-    BOPS_BUSINESS_RUNTIME: 'hermes', BOPS_DISABLE_MAC: '1', PORT: String(entry.port), NODE_ENV: 'production' };
+    BOPS_BUSINESS_RUNTIME: 'hermes', BOPS_DISABLE_MAC: '', PORT: String(entry.port), NODE_ENV: 'production' };
 }
 
 async function verify(entry, fetchImpl = fetch) {
@@ -48,4 +51,4 @@ async function verify(entry, fetchImpl = fetch) {
   if (entry.computerId && health.instance.computerId !== entry.computerId) throw Error(`${entry.name} has the wrong computer binding`);
   return health;
 }
-module.exports = { definitions, registryFile, readRegistry, instanceEnv, verify };
+module.exports = { definitions, registryFile, readRegistry, validateRegistry, instanceEnv, verify };

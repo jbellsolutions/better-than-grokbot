@@ -3,12 +3,15 @@ import { execFile, spawn, type ChildProcessWithoutNullStreams } from "node:child
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { MacApproval, MacState } from "@/lib/types";
+import { live, type MacApproval, type MacState } from "@/lib/types";
 import { codexPath, findCodex, installCodex, installStatus } from "./codex-cli";
-import { lowRisk, TALKING_APPS } from "./judgment";
+import { macAccessAllowed } from "./mac-access";
+import { instanceName } from "./instance";
 import { agentEnv } from "./local";
 import { onPostgres } from "./persist";
-import { addMessage, bot, getState, id, ownerName, update } from "./store";
+import { getState, update } from "./store";
+import { decided, interruptMac } from "./interrupts";
+import { randomUUID } from "node:crypto";
 
 /**
  * The user's Mac, through Codex. Bops drives a local `codex app-server` (OpenAI's documented protocol
@@ -33,8 +36,9 @@ class Codex {
   private pending = new Map<number, { res: (v: unknown) => void; rej: (e: Error) => void }>();
   private listeners = new Map<string, Listener>();
   private starting?: Promise<void>;
+  get processId() { return this.proc?.pid; }
   /** Codex's questions waiting on the user, by approval id: how to answer them. */
-  readonly waiting = new Map<string, { rpcId: number | string; method: string; threadId?: string }>();
+  readonly waiting = new Map<string, { rpcId: number | string; method: string; threadId?: string; itemId?: string; preview?: Record<string, unknown> }>();
   /** Apps the user allowed for the rest of a Codex thread ("this session"). */
   readonly sessionApps = new Map<string, Set<string>>();
   /** A sign-in to Codex open in the browser (signInToCodex), and how the last one ended if it failed. */
@@ -43,6 +47,7 @@ class Codex {
 
   /** Start the app server if it isn't running, and say hello. */
   ready() {
+    if (!macAccessAllowed()) return Promise.reject(Error("Allow this computer to use your Mac first."));
     if (this.proc && this.proc.exitCode === null && this.starting) return this.starting;
     this.starting = (async () => {
       // Bops threads run on the user's own Codex setup, minus a few things:
@@ -54,7 +59,6 @@ class Codex {
       // A disabled entry still needs a valid transport. Setting only enabled=false creates an
       // invalid MCP config when that server wasn't present in the user's configuration.
       const off = ['plugins."composio@composio".enabled=false', 'mcp_servers.cua-driver={command="/usr/bin/true",enabled=false}', 'mcp_servers.cua={command="/usr/bin/true",enabled=false}'];
-      if (process.env.BOPS_DISABLE_MAC === "1") throw new Error("Mac automation is disabled for this computer-bound instance.");
       const proc = spawn(findCodex() ?? "codex", ["app-server", ...off.flatMap((c) => ["-c", c])], {
         cwd: homedir(),
         env: agentEnv({ PATH: codexPath() }),
@@ -78,7 +82,7 @@ class Codex {
         this.login = undefined;
       });
       proc.on("error", () => {});
-      await this.request("initialize", { clientInfo: { name: "bops", title: "Bops", version: "0.1" }, capabilities: { experimentalApi: true, mcpServerOpenaiFormElicitation: true } });
+      await this.request("initialize", { clientInfo: { name: "bops", title: "Bops", version: "0.1" }, capabilities: { experimentalApi: true, mcpServerOpenaiFormElicitation: true } }, 15_000);
       this.send({ jsonrpc: "2.0", method: "initialized" });
     })();
     this.starting.catch(() => (this.starting = undefined));
@@ -128,7 +132,7 @@ class Codex {
       if (m.id !== undefined && !m.method) {
         const p = this.pending.get(m.id as number);
         this.pending.delete(m.id as number);
-        if (m.error) p?.rej(new Error(m.error.message ?? "Codex error"));
+        if (m.error) p?.rej(Object.assign(new Error(m.error.message ?? "Codex error"), { rpcRejected: true }));
         else p?.res(m.result);
       } else if (m.id !== undefined && m.method) void this.ask(m);
       else if (m.method === "serverRequest/resolved") this.resolvedElsewhere(m.params?.requestId as number | string | undefined);
@@ -152,13 +156,6 @@ class Codex {
       const always = app && getState().mac?.alwaysApps.some((a) => a.toLowerCase() === app.toLowerCase());
       const forSession = app && threadId && this.sessionApps.get(threadId)?.has(app.toLowerCase());
       if (always || forSession) return this.respond(m.id!, { action: "accept", content: {} });
-      // Low-stakes for this task (looking at Calculator, Notes, a setting): allowed without asking,
-      // just this once, and said so in the chat. Apps where using them at all can mean talking to
-      // someone (Messages, Mail, Slack…) always ask: on the Mac an app is allowed as a whole.
-      if (app && session && !TALKING_APPS.test(app) && (await lowRisk(`Use the ${app} app on ${ownerName()}'s Mac`, `task: ${session.goal.slice(0, 500)}`))) {
-        addMessage({ chatId: session.chatId, role: "system", text: `${bot(session.botId)?.name ?? "A bot"} used ${app} on your Mac · low risk for this task, so didn't ask`, sessionIds: [session.id] });
-        return this.respond(m.id!, { action: "accept", content: {} });
-      }
       return this.hold(m, { kind: app ? "app" : "other", app, message, sessionId: session?.id, botId: session?.botId });
     }
     if (m.method === "item/commandExecution/requestApproval" || m.method === "item/fileChange/requestApproval") {
@@ -170,6 +167,11 @@ class Codex {
         sessionId: session?.id,
         botId: session?.botId,
       });
+    }
+    if (m.method === "item/permissions/requestApproval") {
+      const permissions = m.params?.permissions;
+      if (!permissions || typeof permissions !== "object" || Array.isArray(permissions)) return this.respond(m.id!, { permissions: {}, scope: "turn" });
+      return this.hold(m, { kind: "permissions", message: String(m.params?.reason || "Grant the requested file or network access for this task"), requestedPermissions: permissions as Record<string, unknown>, sessionId: session?.id, botId: session?.botId });
     }
     // Anything else Codex asks a client (more input, permissions, tokens) Bops doesn't do yet.
     if (m.method?.endsWith("requestApproval") || m.method === "execCommandApproval" || m.method === "applyPatchApproval") return this.respond(m.id!, { decision: "decline" });
@@ -196,12 +198,15 @@ class Codex {
   }
 
   private hold(m: Rpc, a: Omit<MacApproval, "id" | "at">) {
-    const approval: MacApproval = { id: id("ok"), at: Date.now(), ...a };
-    this.waiting.set(approval.id, { rpcId: m.id!, method: m.method!, threadId: m.params?.threadId });
+    const approval: MacApproval = { id: randomUUID(), at: Date.now(), ...a };
+    this.waiting.set(approval.id, { rpcId: m.id!, method: m.method!, threadId: m.params?.threadId, itemId: typeof m.params?.itemId === "string" ? m.params.itemId : undefined,
+      preview: { command: m.params?.command, cwd: m.params?.cwd, grantRoot: m.params?.grantRoot, reason: m.params?.reason } });
     update((state) => {
       state.mac ??= emptyMac();
+      state.mac.accessEnabled ??= false;
       state.mac.approvals.push(approval);
     });
+    interruptMac(approval);
     // Unanswered for ten minutes: no.
     setTimeout(() => this.waiting.has(approval.id) && answer(approval.id, "deny"), 10 * 60_000);
   }
@@ -210,16 +215,20 @@ class Codex {
 const g = globalThis as typeof globalThis & { __bopsCodex?: Codex; __bopsMacCheck?: ReturnType<typeof setInterval> };
 export const codex = (g.__bopsCodex ??= new Codex());
 
-export const emptyMac = (): MacState => ({ ready: false, approvals: [], alwaysApps: [], rules: [...DEFAULT_MAC_RULES] });
+export const emptyMac = (): MacState => ({ ready: false, accessEnabled: false, approvals: [], alwaysApps: [], rules: [...DEFAULT_MAC_RULES] });
 
 /** The user's answer to one of Codex's questions. "always" also remembers the app for every future task. */
-export function answer(approvalId: string, decision: "once" | "session" | "always" | "deny") {
+export function answer(approvalId: string, decision: "once" | "session" | "always" | "deny", by?: string) {
   const w = codex.waiting.get(approvalId);
   const a = getState().mac?.approvals.find((x) => x.id === approvalId);
+  if (!w || !a) return false;
+  if (decision === "always" && a.kind !== "app") throw Error("Always is only available for app access.");
+  if (decision !== "deny" && a.sessionId && !getState().sessions.some(s => s.id === a.sessionId && live(s))) throw Error("This task is no longer active. Its approval cannot be granted.");
+  if (decision !== "deny" && !macAccessAllowed()) throw Error("Mac access is disabled for this computer.");
   codex.waiting.delete(approvalId);
   update((state) => state.mac && (state.mac.approvals = state.mac.approvals.filter((x) => x.id !== approvalId)));
-  if (!w) return;
   const yes = decision !== "deny";
+  decided(approvalId, { confirmed: yes, always: decision === "always", by });
   if (yes && a?.app && decision === "session" && w.threadId) {
     const set = codex.sessionApps.get(w.threadId) ?? new Set<string>();
     set.add(a.app.toLowerCase());
@@ -230,8 +239,10 @@ export function answer(approvalId: string, decision: "once" | "session" | "alway
       state.mac ??= emptyMac();
       if (!state.mac.alwaysApps.some((x) => x.toLowerCase() === a.app!.toLowerCase())) state.mac.alwaysApps.push(a.app!);
     });
-  if (w.method === "mcpServer/elicitation/request") codex.respond(w.rpcId, yes ? { action: "accept", content: {} } : { action: "decline", content: null });
+  if (w.method === "item/permissions/requestApproval") codex.respond(w.rpcId, { permissions: yes ? a.requestedPermissions ?? {} : {}, scope: decision === "session" ? "session" : "turn" });
+  else if (w.method === "mcpServer/elicitation/request") codex.respond(w.rpcId, yes ? { action: "accept", content: {} } : { action: "decline", content: null });
   else codex.respond(w.rpcId, { decision: !yes ? "decline" : decision === "once" ? "accept" : "acceptForSession" });
+  return true;
 }
 
 /** This server runs on the user's Mac (not a hosted one), where Codex can work for the bots. */
@@ -243,8 +254,22 @@ const onTheMac = () => process.platform === "darwin" && !onPostgres();
  * Computer Use on (it comes with OpenAI's Codex app for Mac, not the CLI). Checked now and then, after
  * a sign-in ends, and while the setup card waits on the user; the answer lives in state.mac.
  */
-export async function checkMac() {
-  if (process.env.BOPS_DISABLE_MAC === "1") return false;
+let checking: Promise<boolean> | undefined;
+export function checkMac() {
+  if (!checking) checking = inspectMac().finally(() => { checking = undefined; });
+  return checking;
+}
+
+async function inspectMac() {
+  if (!macAccessAllowed() || !onTheMac()) {
+    update(state => {
+      state.mac ??= emptyMac();
+      state.mac.accessEnabled ??= false;
+      const disabled = process.env.BOPS_DISABLE_MAC === "1";
+      Object.assign(state.mac, { ready: false, next: disabled || !onTheMac() ? "elsewhere" : "permission", reason: disabled ? "Mac automation is disabled by this coordinator’s configuration." : onTheMac() ? `Allow ${instanceName()} to use your Mac. You still approve each app.` : "Mac access requires a coordinator running on your Mac.", checkedAt: Date.now() });
+    });
+    return false;
+  }
   const has = (p: string) => existsSync(p);
   let ready = false;
   let reason: string | undefined;
@@ -255,10 +280,9 @@ export async function checkMac() {
     next = "elsewhere";
     reason = "Computer use works in the Bops app on your Mac.";
   } else if (!bin) {
-    if (!installStatus()) installCodex(() => void checkMac().catch(() => {}));
     const failed = installStatus()?.state === "failed" ? installStatus()?.error : undefined;
     next = "codex";
-    reason = failed !== undefined ? `Couldn't install Codex. ${failed}` : "Installing Codex";
+    reason = failed !== undefined ? `Couldn't install Codex. ${failed}` : "Install Codex to connect this Mac.";
   } else {
     const config = has(join(CODEX_HOME, "config.toml")) ? readFileSync(join(CODEX_HOME, "config.toml"), "utf8") : "";
     const computerUse =
@@ -281,10 +305,10 @@ export async function checkMac() {
       reason = `Codex didn't start (${(e as Error).message.replace(/\.$/, "")}).`;
     }
   }
-  const now = { ready, reason, next, installing: next === "codex" && installStatus()?.state === "installing", signingIn: !!codex.login, plan };
+  const now = { ready, reason, next, accessEnabled: getState().mac?.accessEnabled ?? false, installing: next === "codex" && installStatus()?.state === "installing", signingIn: !!codex.login, plan };
   // The setup card looks every few seconds while it waits on the user: only a change goes out to the app.
   const was = getState().mac;
-  if (was && (Object.keys(now) as (keyof typeof now)[]).every((k) => was[k] === now[k])) return ready;
+  if (was && Date.now() - (was.checkedAt ?? 0) < 30_000 && (Object.keys(now) as (keyof typeof now)[]).every((k) => was[k] === now[k])) return ready;
   update((state) => {
     state.mac ??= emptyMac();
     Object.assign(state.mac, { ...now, checkedAt: Date.now() });

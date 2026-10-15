@@ -1,14 +1,17 @@
 "use client";
 
 import { InstancePicker } from "./instance-picker";
-import { useEffect, useRef, useState } from "react";
+import { AgentCardActions } from "./agent-card-actions";
+import { ManageAgents } from "./manage-agents";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { DISPLAYS, live, workspaceOf, type AppState, type Chat, type Session, type Watch } from "@/lib/types";
+import { conversationIndex, conversationUnread, moveConversation, orderConversations } from "@/lib/conversations";
 import { initialsOf, signOutOfOrgo } from "./account";
 import { KeyIcon } from "./screen-cards";
-import { Mascot } from "./mascot";
 import { useSetupNeedsYou } from "./setup";
 import { WATCH, WatchEye, watchName } from "./watch-overlay";
 import { ago, ChatAvatar, chatInWorkspace, chatName, currentWorkspace, needsYou, post, RoundButton, StatusIcon, teamOf, useNow } from "./ui";
+import { workStatus } from "@/lib/work-status";
 
 /**
  * The sidebar for one workspace (switch at the top). The list: one row per conversation (Sam pinned, then by latest activity), each with its
@@ -44,27 +47,73 @@ export function Sidebar({
   onOpenWatch: (watch: Watch) => void;
 }) {
   const [query, setQuery] = useState<string | null>(null);
+  const [opsBusy, setOpsBusy] = useState(false);
+  const [opsError, setOpsError] = useState("");
   const q = query?.trim().toLowerCase();
   // The "5m" next to each chat stays current.
   useNow(30_000);
 
-  const lastMessage = (c: Chat) => [...state.messages].reverse().find((m) => m.chatId === c.id);
-  const activity = (c: Chat) => lastMessage(c)?.at ?? c.createdAt;
+  const index = useMemo(() => conversationIndex(state.messages), [state.messages]);
+  const lastMessage = (c: Chat) => index.get(c.id)?.last;
   const ws = currentWorkspace(state);
   const team = teamOf(state);
+  const savedOrder = state.workspaces?.find(w => w.id === ws)?.chatOrder;
+  const [pendingOrder, setPendingOrder] = useState<{ workspace: string; ids: string[] | null } | null>(null);
+  const [orderError, setOrderError] = useState("");
+  const [dragged, setDragged] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const savingOrder = useRef(false);
+  const order = pendingOrder?.workspace === ws ? pendingOrder.ids ?? undefined : savedOrder;
+  const orderedChats = orderConversations(state.chats.filter(c => chatInWorkspace(state, c)), index, order);
+  const saveOrder = async (ids: string[] | null) => {
+    if (savingOrder.current) return;
+    savingOrder.current = true; setOrderError(""); setPendingOrder({ workspace: ws, ids });
+    try {
+      const r = await post("/api/chats/order", { workspaceId: ws, chatIds: ids }, "PUT");
+      if (!r.ok) throw Error((await r.json()).error || "Could not save the card order.");
+    } catch (e) { setOrderError((e as Error).message); }
+    finally { savingOrder.current = false; setPendingOrder(null); }
+  };
+  const move = (from: string, to: string) => {
+    if (from !== to && orderedChats.some(c => c.id === from) && orderedChats.some(c => c.id === to))
+      void saveOrder(moveConversation(orderedChats.map(c => c.id), from, to));
+    setDragged(null); setDropTarget(null);
+  };
+  const addOps = async () => {
+    setOpsBusy(true); setOpsError("");
+    try {
+      const name = team.some(b => b.name.toLowerCase() === "bapi") ? "Head of Ops" : "Bapi";
+      const res = await post("/api/bots", { name, role: "Head of Operations", teamRole: "operations" });
+      const data = await res.json(); if (!res.ok) throw Error(data.error || "Could not add the operations lead.");
+      onOpenChat(data.chatId);
+    } catch (e) { setOpsError((e as Error).message); }
+    finally { setOpsBusy(false); }
+  };
   const hidden = team.filter(b => b.hidden && !b.isMain);
   const [visibilityError, setVisibilityError] = useState("");
-  const chats = [...state.chats]
-    .filter((c) => chatInWorkspace(state, c))
+  const setVisibility = async (botId: string, hidden: boolean) => {
+    setVisibilityError("");
+    try { const r = await post("/api/bots", { botId, hidden }, "PATCH"); if (!r.ok) throw Error((await r.json()).error || "Could not update the card."); }
+    catch (e) { setVisibilityError((e as Error).message); }
+  };
+  const chats = orderedChats
     .filter(c => c.kind !== "bot" || !state.bots.find(b => b.id === c.botIds[0])?.hidden)
-    .filter((c) => !q || chatName(c, state.bots).toLowerCase().includes(q) || state.messages.some((m) => m.chatId === c.id && m.text.toLowerCase().includes(q)))
-    .sort((a, b) => {
-      const pin = (c: Chat) => (c.kind === "bot" && state.bots.find((x) => x.id === c.botIds[0])?.isMain ? 1 : 0);
-      return pin(b) - pin(a) || activity(b) - activity(a);
-    });
+    .filter((c) => !q || chatName(c, state.bots).toLowerCase().includes(q) || state.messages.some((m) => m.chatId === c.id && m.text.toLowerCase().includes(q)));
 
-  const mainBot = team.find((b) => b.isMain);
-  const mainChat = mainBot ? state.chats.find((c) => c.kind === "bot" && c.botIds[0] === mainBot.id) : undefined;
+  const list = useRef<HTMLDivElement>(null);
+  const positions = useRef(new Map<string, number>());
+  useLayoutEffect(() => {
+    const next = new Map<string, number>();
+    for (const row of list.current?.querySelectorAll<HTMLElement>("[data-chat]") ?? []) {
+      const id = row.dataset.chat!;
+      const top = row.offsetTop;
+      const before = positions.current.get(id);
+      next.set(id, top);
+      if (before !== undefined && before !== top && !window.matchMedia("(prefers-reduced-motion: reduce)").matches)
+        row.animate([{ transform: `translateY(${before - top}px)` }, { transform: "translateY(0)" }], { duration: 220, easing: "ease-out" });
+    }
+    positions.current = next;
+  });
 
   const threads = [...state.sessions]
     .filter((s) => workspaceOf(state.bots.find((b) => b.id === s.botId)) === ws && state.bots.some((b) => b.id === s.botId) && !s.replacedBy)
@@ -75,6 +124,7 @@ export function Sidebar({
   return (
     <aside className="flex min-h-0 min-w-0 flex-col overflow-hidden border-r border-[#ECECEA] bg-[#F9F9F8] px-2.5 pb-3 pt-3.5">
       <InstancePicker />
+      <ManageAgents key={ws} team={team} computerId={state.instance?.computerId} />
       {state.instance?.id !== "default" && state.instance && <button onClick={onBusiness} className="mx-1 mb-3 rounded-xl border border-[#E6E6E3] bg-white px-3 py-2 text-left text-xs font-semibold">Business desk · profiles, queue, contacts & history</button>}
       <div className="flex items-center justify-between pb-3 pl-2.5 pr-2">
         {query === null ? (
@@ -103,27 +153,42 @@ export function Sidebar({
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-        {/* The main bot runs the team, so it sits above it (once you type a search, everything lists together). */}
-        {!q && mainChat && <MainBot chat={mainChat} state={state} selected={mainChat.id === chatId} onClick={() => onOpenChat(mainChat.id)} last={lastMessage(mainChat)} />}
-        <div className="flex flex-col gap-0.5">
-          {chats
-            .filter((c) => !!q || c !== mainChat)
-            .map((c) => (
-              <ChatRow key={c.id} chat={c} state={state} selected={c.id === chatId} onClick={() => onOpenChat(c.id)} last={lastMessage(c)} />
-            ))}
+        <div className="mb-1 flex items-center justify-between px-2.5 text-xs text-[#6B6B6B]">
+          <span>Agent cards</span>
+          <select aria-label="Card order" value={order ? "manual" : "recent"} disabled={pendingOrder !== null} onChange={e => void saveOrder(e.target.value === "manual" ? orderedChats.map(c => c.id) : null)} className="rounded-lg border border-[#E6E6E3] bg-white px-2 py-1 text-xs">
+            <option value="recent">Recent activity</option><option value="manual">My order</option>
+          </select>
         </div>
+        {order && <p className="px-2.5 pb-2 text-[11px] text-[#9A9A98]">Drag a handle or use the card menu to move.</p>}
+        {(orderError || visibilityError) && <p role="alert" className="px-2.5 py-2 text-xs text-[#B42318]">{orderError || visibilityError}</p>}
+        <div ref={list} className="relative flex flex-col gap-0.5">
+          {chats.map((c, position) => {
+            const unread = conversationUnread(c, index.get(c.id)?.incomingAt);
+            const solo = c.kind === "bot" ? state.bots.find(b => b.id === c.botIds[0]) : undefined;
+            const name = chatName(c, state.bots);
+            return <div key={c.id} data-chat={c.id} onDragOver={e => { if (dragged && !savingOrder.current) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDropTarget(c.id); } }} onDrop={e => { e.preventDefault(); const from = e.dataTransfer.getData("application/x-bops-chat"); if (dragged === from) move(from, c.id); }} className={`group/chat relative rounded-[14px] ${dropTarget === c.id && dragged !== c.id ? "ring-2 ring-inset ring-[#9A9A98]" : ""} ${dragged === c.id ? "opacity-50" : ""}`}>
+              {order && <button aria-label={`Drag ${name} to reorder`} title="Drag to reorder, or use the up and down arrow keys" draggable={!pendingOrder} onDragStart={e => { e.dataTransfer.setData("application/x-bops-chat", c.id); e.dataTransfer.effectAllowed = "move"; setDragged(c.id); }} onDragEnd={() => { setDragged(null); setDropTarget(null); }} onKeyDown={e => {
+                const neighbor = e.key === "ArrowUp" ? chats[position - 1] : e.key === "ArrowDown" ? chats[position + 1] : undefined;
+                if (["ArrowUp", "ArrowDown"].includes(e.key)) { e.preventDefault(); if (neighbor) move(c.id, neighbor.id); }
+              }} className="absolute left-0 top-4 z-10 flex h-8 w-3 cursor-grab items-center justify-center text-[#9A9A98] active:cursor-grabbing">
+                <svg width="6" height="16" viewBox="0 0 6 16" aria-hidden="true">{[3, 8, 13].flatMap(y => [1, 5].map(x => <circle key={`${x}:${y}`} cx={x} cy={y} r="0.8" fill="currentColor" />))}</svg>
+              </button>}
+              <ChatRow chat={c} state={state} selected={c.id === chatId} unread={unread} onClick={() => onOpenChat(c.id)} last={lastMessage(c)} />
+              <AgentCardActions bot={solo} name={name} unread={unread} computerId={state.instance?.computerId} canMoveUp={position > 0} canMoveDown={position < chats.length - 1} moving={pendingOrder !== null} onMove={direction => move(c.id, chats[position + direction].id)} onRead={() => void post(`/api/chats/${encodeURIComponent(c.id)}/read`, { unread: !unread })} onVisibility={() => solo ? setVisibility(solo.id, true) : Promise.resolve()} />
+            </div>;
+          })}
+        </div>
+
+        {!q && !team.some(b => b.teamRole === "operations") && <button disabled={opsBusy} onClick={() => void addOps()} className="mx-2 mt-2 rounded-xl border border-dashed border-[#D9D9D6] px-3 py-2 text-left text-[12px] text-[#6B6B6B] hover:bg-white">{opsBusy ? "Adding Bapi…" : "+ Add head of operations"}</button>}
+        {opsError && <span role="alert" className="px-3 py-2 text-[12px] text-[#B42318]">{opsError}</span>}
 
         {hidden.length > 0 && <details className="mx-2 mt-3 text-xs text-[#6B6B6B]">
           <summary className="cursor-pointer py-2">Hidden profiles ({hidden.length})</summary>
-          {hidden.map(b => <div key={b.id} className="flex min-w-0 items-center gap-2 py-1">
+          {hidden.map(b => <div key={b.id} className="relative flex min-w-0 items-center gap-2 py-2 pr-9">
             <button className="min-w-0 flex-1 truncate text-left" onClick={() => { const c = state.chats.find(c => c.kind === "bot" && c.botIds[0] === b.id); if (c) onOpenChat(c.id); }}>{b.name}</button>
-            <button aria-label={`Show ${b.name}`} className="shrink-0 underline" onClick={async () => {
-              setVisibilityError("");
-              try { const r = await post("/api/bots", { botId: b.id, hidden: false }, "PATCH"); if (!r.ok) throw Error((await r.json()).error || "Could not show profile."); }
-              catch (e) { setVisibilityError((e as Error).message); }
-            }}>Show</button>
+            <button aria-label={`Show ${b.name}`} className="shrink-0 underline" onClick={() => void setVisibility(b.id, false)}>Show</button>
+            <AgentCardActions bot={b} name={b.name} unread={false} computerId={state.instance?.computerId} canMoveUp={false} canMoveDown={false} moving={false} onMove={() => {}} onRead={() => void post(`/api/chats/${encodeURIComponent(state.chats.find(c => c.kind === "bot" && c.botIds[0] === b.id)?.id ?? "")}/read`, { unread: true })} onVisibility={() => setVisibility(b.id, false)} />
           </div>)}
-          {visibilityError && <p role="alert" className="text-red-700">{visibilityError}</p>}
         </details>}
 
         {!q && <Watching state={state} onOpen={onOpenWatch} />}
@@ -135,11 +200,14 @@ export function Sidebar({
               <button
                 key={s.id}
                 onClick={() => onOpenThread(s)}
-                className="group/thread flex h-[34px] items-center gap-2 rounded-[10px] px-2.5 text-left hover:bg-black/[0.03]"
+                className="group/thread flex min-h-[46px] items-center gap-2 rounded-[10px] px-2.5 py-1 text-left hover:bg-black/[0.03]"
               >
-                <span className={`min-w-0 flex-1 truncate text-[14px] leading-[18px] ${live(s) || needsYou(s) ? "text-ink" : "text-[#6B6B6B]"}`}>{s.title}</span>
-                {(live(s) || needsYou(s)) && <StatusIcon session={s} />}
-                {!live(s) && <DeleteX label={`Delete ${s.title}`} onDelete={() => void post(`/api/sessions/${s.id}`, {}, "DELETE")} className="group-hover/thread:opacity-100" />}
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className={`truncate text-[14px] leading-[18px] ${live(s) || needsYou(s) ? "text-ink" : "text-[#6B6B6B]"}`}>{s.title}</span>
+                  <span className="truncate text-[11px] leading-4 text-[#6B6B6B]" title={workStatus(s).text}>{workStatus(s).text}</span>
+                </span>
+                <StatusIcon session={s} />
+                {workStatus(s).canDelete && <DeleteX label={`Delete ${s.title}`} onDelete={() => void post(`/api/sessions/${s.id}`, {}, "DELETE")} className="group-hover/thread:opacity-100" />}
               </button>
             ))}
           </div>
@@ -274,45 +342,9 @@ function YouMenu({ state, onAccount, onSettings, onSetup }: { state: AppState; o
   );
 }
 
-/**
- * The main bot (Sam) as the head of the team, like Grok's: big, starred, with how the team is doing
- * at a glance. Click it to talk to Sam.
- */
-function MainBot({ chat: c, state, selected, onClick, last }: { chat: Chat; state: AppState; selected: boolean; onClick: () => void; last?: AppState["messages"][number] }) {
-  const b = state.bots.find((x) => x.id === c.botIds[0])!;
-  const unread = !!last && last.role !== "user" && last.at > (c.readAt ?? 0) && !selected;
-  const mine = new Set(teamOf(state).map((x) => x.id));
-  const sessions = state.sessions.filter((s) => mine.has(s.botId));
-  const working = new Set(sessions.filter((s) => live(s) && !s.askWhere).map((s) => s.botId)).size;
-  const waiting = sessions.filter((s) => needsYou(s)).length + (state.mac?.approvals.length ?? 0) + (state.watches?.filter((w) => w.alert && mine.has(w.botId)).length ?? 0);
-  // One line: what needs you, else who's working, else just the role.
-  const status = c.typing.length ? "typing…" : waiting ? `${waiting} need${waiting === 1 ? "s" : ""} you` : working ? `${working} working` : "Chief of Staff";
-  return (
-    <button
-      onClick={onClick}
-      className={`relative mb-2 flex flex-col items-center gap-1.5 rounded-[18px] px-3 pb-3 pt-4 text-center ${selected ? "bg-[#EEEEEC]" : "hover:bg-black/[0.03]"}`}
-    >
-      <span className="relative">
-        <Mascot botId={b.id} color={b.color} size={64} />
-        <span className="absolute -bottom-0.5 -right-0.5 flex size-[22px] items-center justify-center rounded-full bg-highlighter shadow-[0_0_0_2.5px_#F9F9F8,0_0_0_3.5px_#0A0A0A]" title="Runs the team">
-          <svg width="11" height="11" viewBox="0 0 12 12">
-            <path d="M6 1l1.5 3.1 3.4.5-2.5 2.4.6 3.4L6 8.8 2.9 10.4l.6-3.4L1 4.6l3.5-.5z" fill="#0A0A0A" />
-          </svg>
-        </span>
-        {unread && <span data-tip="Unread" className="absolute -left-0.5 top-0.5 size-[11px] rounded-full bg-highlighter shadow-[0_0_0_1.5px_#0A0A0A,0_0_0_3.5px_#F9F9F8]" />}
-      </span>
-      <span className="flex flex-col items-center gap-0.5">
-        <span className="text-[16px] font-semibold leading-5">{b.name}</span>
-        <span className={`text-[12.5px] leading-4 ${waiting ? "font-medium text-ink" : "text-[#9A9A98]"}`}>{status}</span>
-      </span>
-    </button>
-  );
-}
-
-function ChatRow({ chat: c, state, selected, onClick, last }: { chat: Chat; state: AppState; selected: boolean; onClick: () => void; last?: AppState["messages"][number] }) {
+function ChatRow({ chat: c, state, selected, unread, onClick, last }: { chat: Chat; state: AppState; selected: boolean; unread: boolean; onClick: () => void; last?: AppState["messages"][number] }) {
   const members = state.bots.filter((b) => c.botIds.includes(b.id));
   const solo = c.kind === "bot" ? members[0] : undefined;
-  const unread = !!last && last.role !== "user" && last.at > (c.readAt ?? 0) && !selected;
   const typing = c.typing.length > 0;
   const preview = typing
     ? "typing…"
@@ -329,21 +361,16 @@ function ChatRow({ chat: c, state, selected, onClick, last }: { chat: Chat; stat
         : `${members.map((m) => m.name).join(", ")} and you`;
 
   return (
-    <button onClick={onClick} className={`flex items-center gap-3 rounded-[14px] p-2.5 text-left ${selected ? "bg-[#EEEEEC]" : "hover:bg-black/[0.03]"}`}>
-      <ChatAvatar chat={c} bots={state.bots} size={44} />
+    <button onClick={onClick} className={`flex w-full items-center gap-2 rounded-[14px] py-2.5 pl-3.5 pr-9 text-left ${selected ? "bg-[#EEEEEC]" : "hover:bg-black/[0.03]"}`}>
+      <ChatAvatar chat={c} bots={state.bots} size={36} />
       <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
         <div className="flex items-center gap-1.5">
-          <span className="truncate text-[15px] font-semibold leading-[18px]">{c.title ?? (solo ? solo.name : members.map((m) => m.name).join(", "))}</span>
-          {solo && (
-            <span title={solo.role} className={`max-w-[110px] shrink-0 truncate rounded-[5px] px-1.5 py-px text-[11px] leading-[14px] text-[#6B6B6B] ${selected ? "bg-white" : "bg-[#EEEEEC]"}`}>
-              {solo.role}
-            </span>
-          )}
-          <span className="flex-1" />
-          <span className="shrink-0 text-[12px] leading-4 text-[#9A9A98]">{last ? ago(last.at) : ""}</span>
+          <span className="min-w-0 flex-1 truncate text-[15px] font-semibold leading-[18px]">{c.title ?? (solo ? solo.name : members.map((m) => m.name).join(", "))}</span>
         </div>
+        {solo && (solo.isMain || solo.teamRole === "operations") && <span className="text-[10px] font-medium leading-3 text-[#9A9A98]">{solo.isMain ? "Orchestrator" : "Head of ops"}</span>}
         <div className="flex items-center gap-2">
           <span className={`min-w-0 flex-1 truncate text-[13px] leading-[17px] ${unread ? "font-medium text-ink" : typing ? "text-[#6B6B6B] italic" : "text-[#6B6B6B]"}`}>{preview}</span>
+          <span className="shrink-0 text-[11px] leading-4 text-[#9A9A98]">{last ? ago(last.at) : ""}</span>
           {unread && <span data-tip="Unread" className="size-[9px] shrink-0 rounded-full bg-highlighter shadow-[0_0_0_1.5px_#0A0A0A]" />}
         </div>
       </div>

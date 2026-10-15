@@ -1,11 +1,10 @@
-import { dataPath } from "@/lib/server/instance";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
 /**
  * An app's real logo, from Composio's logo service, kept on disk after the first fetch so the Vault
  * and the app picker draw instantly (and offline). Only app slugs: letters, digits, _ and -.
  */
-const DIR = dataPath("logos");
+const DIR = `${process.cwd()}/.data/logos`;
 
 export async function GET(_request: Request, ctx: { params: Promise<{ app: string }> }) {
   const { app } = await ctx.params;

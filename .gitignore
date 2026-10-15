@@ -54,3 +54,10 @@ next-env.d.ts
 # Bops Cloud installs its two dependencies here on its box
 /cloud/node_modules
 .scratch/
+
+# Python bridge test bytecode
+__pycache__/
+*.pyc
+
+# Agent charters written during install (INSTALL.md): yours, not the project's.
+/charters/

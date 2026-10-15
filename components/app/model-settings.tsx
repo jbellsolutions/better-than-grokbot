@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import type { Bot } from "@/lib/types";
 
-type Choice = { id: string; name: string; prompt: string; completion: string };
+type Choice = { id: string; name: string; prompt: string; completion: string; reasoning: boolean; efforts: string[] };
 type Status = { provider: string; configured: boolean; defaultModel: string; cloudModel: string; models: Choice[]; error?: string };
 
 export function ModelSettings({ bot, className = "" }: { bot?: Bot; className?: string }) {
@@ -44,6 +44,7 @@ export function ModelSettings({ bot, className = "" }: { bot?: Bot; className?: 
         </select>
       </label>
       {choice && <span className="text-[12px] text-[#6B6B6B]">Listed rate per 1M tokens: {price(choice.prompt)} input · {price(choice.completion)} output. OpenRouter bills usage separately.</span>}
+      {choice && <span className="text-[12px] text-[#6B6B6B]">{choice.reasoning ? `Reasoning: ${choice.efforts.length ? choice.efforts.join(", ") : "provider effort controls"}. Unsupported levels use an available lower level.` : "This model does not advertise reasoning controls; the effort setting is omitted."}</span>}
       <span className="text-[12px] leading-4 text-[#6B6B6B]">{bot ? "This choice stays with the agent when you switch computers. Choosing the team default follows future team model changes." : "Agents using the team default follow this choice. Individual agent overrides keep their own model."} Mac tasks continue to use signed-in Codex.</span>
       {pick !== current && <button disabled={busy} onClick={() => void save()} className="self-start rounded-full bg-ink px-3 py-1.5 text-[12px] font-medium text-white">{busy ? "Saving…" : "Save model"}</button>}
     </>}

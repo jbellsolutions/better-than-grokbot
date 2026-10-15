@@ -6,7 +6,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const ts = require('typescript');
 const loadInstance = require('./helpers/instance.cjs');
-const { initialize } = require('../scripts/instances.cjs');
+const { initialize, add } = require('../scripts/instances.cjs');
 const { readRegistry, instanceEnv, verify } = require('../desktop/instances.cjs');
 
 function fixture(t) {
@@ -14,7 +14,9 @@ function fixture(t) {
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   fs.mkdirSync(path.join(root, '.data'));
   fs.writeFileSync(path.join(root, '.data/state.json'), '{"existing":"preserve exactly"}');
-  return { root, entries: initialize(root) };
+  initialize(root);
+  add('team-a', 'Team A', '11111111-1111-4111-8111-111111111111', 'Sales', root);
+  return { root, entries: add('team-b', 'Team B', '22222222-2222-4222-8222-222222222222', 'Research', root) };
 }
 
 test('setup preserves the current team byte for byte and reruns preserve each new instance history', t => {
@@ -47,10 +49,10 @@ test('business instances exclude shared provider identities and subscriptions bu
   assert.equal(env.BOPS_SELF_HOSTED, '1');
   assert.equal(env.BOPS_COMPUTER_OBSERVE_ONLY, '1');
   assert.equal(env.PORT, '3211');
-  fs.writeFileSync(path.join(root, '.data/instances/ai-guy/.env.local'), 'COMPOSIO_API_KEY=own-app\nBOPS_INSTANCE_ID=wrong\nBOPS_ORGO_COMPUTER_ID=wrong\n');
+  fs.writeFileSync(path.join(root, '.data/instances/team-a/.env.local'), 'COMPOSIO_API_KEY=own-app\nBOPS_INSTANCE_ID=wrong\nBOPS_ORGO_COMPUTER_ID=wrong\n');
   const own = instanceEnv(root, entries[1], {});
   assert.equal(own.COMPOSIO_API_KEY, 'own-app');
-  assert.equal(own.BOPS_INSTANCE_ID, 'ai-guy');
+  assert.equal(own.BOPS_INSTANCE_ID, 'team-a');
   assert.equal(own.BOPS_ORGO_COMPUTER_ID, entries[1].computerId);
 });
 
@@ -89,7 +91,7 @@ test('switch targets require matching instance and computer identities, not mere
   const { entries } = fixture(t);
   const entry = entries[1];
   await verify(entry, async () => Response.json({ bops: true, instance: { id: entry.id, computerId: entry.computerId } }));
-  for (const instance of [{ id: 'revenue-partners', computerId: entry.computerId }, { id: entry.id, computerId: 'wrong' }, undefined]) {
+  for (const instance of [{ id: 'team-b', computerId: entry.computerId }, { id: entry.id, computerId: 'wrong' }, undefined]) {
     await assert.rejects(verify(entry, async () => Response.json({ bops: true, instance })), /Another server|wrong computer/);
   }
   await assert.rejects(verify(entry, async () => { throw Error('offline'); }), /offline/);
@@ -122,13 +124,23 @@ test('native packaging removes traced instance secrets, history and checkout cop
   assert.ok(fs.existsSync(path.join(root, '.data/state.json')));
 });
 
-test('the registry accepts the two separately hosted instances but rejects arbitrary endpoints', t => {
+test('the registry accepts more separately hosted teams but rejects arbitrary endpoints', t => {
   const { root, entries } = fixture(t);
   const file = path.join(root, '.data/instances.json');
-  const all = [...entries, { id: 'chief-sales-officer', port: 3213, url: 'http://localhost:3213' }, { id: 'co-founder', port: 3214, url: 'http://localhost:3214' }];
+  const all = [...entries, { id: 'team-c', port: 3213, url: 'http://localhost:3213' }, { id: 'team-d', port: 3214, url: 'http://localhost:3214' }];
   fs.writeFileSync(file, JSON.stringify(all)); assert.equal(readRegistry(root).length, 5);
   for (const change of [{ id: '../unsafe' }, { url: 'https://example.com' }, { port: 443 }]) {
     fs.writeFileSync(file, JSON.stringify(all.map((e, i) => i === 4 ? { ...e, ...change } : e)));
     assert.throws(() => readRegistry(root), /Invalid/);
   }
+});
+
+test('adding a team takes the next port and refuses bad ids, duplicates and missing computers', t => {
+  const { root, entries } = fixture(t);
+  assert.deepEqual(entries.map(e => [e.id, e.port, e.cdp]), [['default', 3210, 9300], ['team-a', 3211, 10300], ['team-b', 3212, 11300]]);
+  assert.equal(readRegistry(root).length, 3);
+  assert.throws(() => add('team-a', 'Again', '33333333-3333-4333-8333-333333333333', 'x', root), /already/);
+  assert.throws(() => add('Bad Id', 'Bad', '33333333-3333-4333-8333-333333333333', 'x', root), /team id/);
+  assert.throws(() => add('team-c', 'No computer', 'not-a-uuid', 'x', root), /Orgo computer/);
+  assert.equal(readRegistry(root).length, 3);
 });

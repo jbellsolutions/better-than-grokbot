@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * AgentPhone's webhooks (texts to Bops' numbers, each turn of a call to one, and call summaries),
- * public at api.bops.bot/hooks/agentphone (the Fly relay in edge/ forwards them here over the
+ * public at <your front door>/hooks/agentphone (the relay in edge/ forwards them here over the
  * tailnet). Signed: HMAC-SHA256 of "{timestamp}.{raw body}" in X-Webhook-Signature as "sha256=<hex>",
  * at most 5 minutes old. Each webhook Bops made has its own secret (the sub-account's, and one per
  * workspace number's agent); a delivery must match one of them. Anything else is turned away.

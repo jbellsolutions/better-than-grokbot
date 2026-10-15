@@ -4,6 +4,7 @@ import { AgentMailClient, type AgentMail } from "agentmail";
 import { botChatId, MAIN_WORKSPACE, workspaceOf, type Bot, type EmailInfo, type Message } from "@/lib/types";
 import { cloudOn, cloudSessionNow } from "./cloud";
 import { askOwner } from "./composio";
+import { noteOutcome } from "./interrupts";
 import { saveUpload } from "./uploads";
 import { addMessage, bot, getState, installId, ofThisUser, ownerName, update } from "./store";
 import { recordUsage } from "./usage";
@@ -588,7 +589,10 @@ async function withOk(b: Bot, recipients: string[], title: string, detail: strin
   const mine = ownerAddresses();
   if (recipients.length && recipients.every((x) => mine.includes(bare(x)))) return go();
   const owner = ownerName();
-  const ask = askOwner({ botId: b.id, app: "email", action: "send_email", title, detail, ...where }).then((yes) => (yes ? go() : `${owner} said no. Don't send it.`));
+  // An email goes to someone else, so each one is asked: no "Always allow".
+  const decision = askOwner({ botId: b.id, app: "email", action: "send_email", title, detail, effect: "write", allowAlways: false, ...where });
+  const ask = decision.then((yes) => (yes ? go() : `${owner} said no. Don't send it.`));
+  noteOutcome(decision.approvalId, ask);
   if (onAsk) {
     onAsk(ask);
     return `${owner} has to approve this email first. Bops is showing them the whole thing. Tell them in one short line, and don't call it again.`;

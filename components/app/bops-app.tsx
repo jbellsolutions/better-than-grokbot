@@ -350,6 +350,7 @@ function Bops({ state }: { state: AppState | null }) {
     }
   };
   const openChat = (id: string) => {
+    void post(`/api/chats/${encodeURIComponent(id)}/read`);
     setChatId(id);
     setThreadId(null);
     setComposing(false);

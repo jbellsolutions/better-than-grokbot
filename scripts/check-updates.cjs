@@ -5,7 +5,7 @@ const os = require('node:os');
 const { execFileSync } = require('node:child_process');
 const root = process.env.BOPS_PROJECT_DIR || path.resolve(__dirname, '..');
 const file = path.join(root, '.data', 'updates.json');
-const repo = 'https://api.github.com/repos/nickvasilescu/bops';
+const repo = 'https://api.github.com/repos/jbellsolutions/better-than-grokbot';
 async function json(url) {
   const response = await fetch(url, { headers: { 'User-Agent': 'Bops-Self-Hosted-Update-Check', Accept: 'application/json' }, signal: AbortSignal.timeout(20000) });
   if (!response.ok) throw Error(`HTTP ${response.status}`);
@@ -23,26 +23,21 @@ async function main() {
   const sources = [...before.sources];
   const notices = [];
   const errors = [];
-  // Sync source refs using an isolated checkout. Never merge into the live tree,
-  // build, run upstream scripts, or change the installed app in this hourly job.
-  try {
-    require('./sync-upstream.cjs').syncUpstream(root);
-  } catch { errors.push('Upstream source sync failed; the running app was left unchanged.'); }
   const feeds = [
     { id: 'paid', label: 'Official Bops app', load: async () => {
       const r = await json('https://bops.bot/download/latest.json');
       if (!/^\d+\.\d+\.\d+$/.test(r.version)) throw Error('Invalid app version');
       return { version: r.version, fingerprint: `${r.version}:${r.released || ''}`, url: 'https://bops.bot', notes: Array.isArray(r.notes) ? r.notes.filter(n => typeof n === 'string').slice(0, 10) : [] };
     } },
-    { id: 'source', label: 'Open-source repository', load: async () => {
+    { id: 'source', label: 'Better Than GrokBot source', load: async () => {
       const r = await json(`${repo}/commits/main`);
       if (!/^[a-f0-9]{40}$/.test(r.sha)) throw Error('Invalid commit');
-      return { version: r.sha.slice(0, 7), fingerprint: r.sha, url: `https://github.com/nickvasilescu/bops/commit/${r.sha}`, notes: [r.commit.message.split('\n')[0]] };
+      return { version: r.sha.slice(0, 7), fingerprint: r.sha, url: `https://github.com/jbellsolutions/better-than-grokbot/commit/${r.sha}`, notes: [r.commit.message.split('\n')[0]] };
     } },
     { id: 'release', label: 'GitHub release', load: async () => {
       const r = await json(`${repo}/releases/latest`);
       if (typeof r.tag_name !== 'string') throw Error('Invalid release');
-      return { version: r.tag_name, fingerprint: `${r.id}:${r.updated_at}`, url: `https://github.com/nickvasilescu/bops/releases/tag/${encodeURIComponent(r.tag_name)}`, notes: [] };
+      return { version: r.tag_name, fingerprint: `${r.id}:${r.updated_at}`, url: `https://github.com/jbellsolutions/better-than-grokbot/releases/tag/${encodeURIComponent(r.tag_name)}`, notes: [] };
     } },
   ];
   for (const feed of feeds) {

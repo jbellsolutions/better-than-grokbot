@@ -1,5 +1,6 @@
-# Bops' public front door: api.bops.bot → webhooks → Bops on the user's Mac (over the tailnet).
-app = "bops-api"
+# Your public front door on Fly: your address → webhooks → Bops on your Mac (over your tailnet).
+# Set app to your own Fly app's name (fly launch --no-deploy makes one).
+app = "your-bops-front-door"
 primary_region = "sjc"
 
 [env]

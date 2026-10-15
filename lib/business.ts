@@ -51,3 +51,9 @@ export type BusinessReconciliation = {
     newsletters: { audience: string; campaign: number; list: number; count: number; status: string }[];
     holds: string[];
 };
+
+/** An agent profile a business instance can import (.data/business/current-profiles.json). None ship. */
+export type BusinessProfile = {
+    id: string; name: string; instances: string[]; optional: boolean; screen: 'none' | 'optional' | string;
+    instructions: string; sources: { id: string; name?: string; decision?: string }[];
+};

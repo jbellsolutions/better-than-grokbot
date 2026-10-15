@@ -11,8 +11,8 @@ function load(file, modules = {}, env = {}, extras = {}) {
   return exports;
 }
 const types = load('lib/types.ts');
-const original = 'afdb8c8d-345a-4d52-ad45-e0f60e7ca9ea';
-const target = 'eed51fbb-8f2e-4b78-8d8f-8aa672b11df5';
+const original = 'aaaaaaaa-1111-4aaa-8aaa-aaaaaaaaaaaa';
+const target = 'bbbbbbbb-2222-4bbb-8bbb-bbbbbbbbbbbb';
 function fixture() {
   const main = { id: 'main', name: 'Main', isMain: true, computerId: original, computerStatus: 'ready' };
   const scout = { id: 'scout', name: 'Scout', isMain: false, computer: 'shared', computerStatus: 'none' };

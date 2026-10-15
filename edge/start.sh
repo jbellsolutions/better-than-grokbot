@@ -9,6 +9,6 @@ tailscaled --state=/var/lib/tailscale/tailscaled.state --socket=/var/run/tailsca
 # First boot: no saved login, so this prints a link to approve the machine (in `fly logs`), or uses
 # TS_AUTHKEY if that secret is set. Later boots reuse the saved login. In the background, so the
 # relay answers health checks meanwhile.
-tailscale up --hostname=bops-api --accept-dns=false ${TS_AUTHKEY:+--auth-key=$TS_AUTHKEY} &
+tailscale up --hostname=${TS_HOSTNAME:-bops-front-door} --accept-dns=false ${TS_AUTHKEY:+--auth-key=$TS_AUTHKEY} &
 
 exec node /app/server.mjs

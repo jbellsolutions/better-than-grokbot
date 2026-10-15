@@ -1,4 +1,8 @@
-// Three coordinators share code, never mutable state. No VM setup or campaign activation here.
+// Separate teams on one Mac share code, never mutable state. Each is bound to an existing Orgo computer.
+// No VM setup or campaign activation here.
+//
+//   node scripts/instances.cjs add <id> "<Team name>" <orgo-computer-id> ["<purpose>"]
+//   node scripts/instances.cjs setup | enable | status
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
@@ -9,9 +13,9 @@ const label = id => `ai.orgo.bops.selfhosted.${id}`;
 const plist = id => path.join(os.homedir(), 'Library/LaunchAgents', `${label(id)}.plist`);
 
 function initialize(projectRoot = root) {
-  const entries = definitions.map(d => ({ ...d, url: `http://localhost:${d.port}` }));
+  let entries = definitions.map(d => ({ ...d, url: `http://localhost:${d.port}` }));
   fs.mkdirSync(path.join(projectRoot, '.data'), { recursive: true, mode: 0o700 });
-  if (fs.existsSync(registryFile(projectRoot))) readRegistry(projectRoot);
+  if (fs.existsSync(registryFile(projectRoot))) entries = readRegistry(projectRoot);
   else fs.writeFileSync(registryFile(projectRoot), JSON.stringify(entries, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
   for (const e of entries.filter(e => e.id !== 'default')) {
     const dir = path.join(projectRoot, '.data', 'instances', e.id);
@@ -19,9 +23,7 @@ function initialize(projectRoot = root) {
     const target = path.join(dir, 'state.json');
     if (fs.existsSync(target)) continue;
     const at = Date.now();
-    const roles = e.id === 'ai-guy'
-      ? [['ops', 'AI Guy', 'Coordinate cold email from approved charters. Keep campaigns paused until explicit release.'], ['writer', 'Writer', 'Draft evidence-backed cold email. Never upload or send.'], ['editorial', 'Editorial', 'Independently review claims, evidence and copy.'], ['deliverability', 'Deliverability', 'Review verification, suppression and sender health.'], ['replies', 'Replies', 'Triage cold-email replies and draft responses.']]
-      : [['ops', 'Revenue Partners', 'Coordinate prospecting, qualification and partner research. Keep outreach paused until explicit release.'], ['prospector', 'Prospector', 'Research buying signals and match qualified prospects to approved offers.'], ['data', 'Data', 'Resolve contact identity and source provenance. No paid pulls without an approved budget.'], ['list-manager', 'List Manager', 'Maintain dedupe, source lists and suppression records.'], ['crm', 'CRM', 'Prepare CRM updates from actual completed touches.'], ['dream', 'Dream Partners', 'Research Dream partners and prepare briefs only. The owner writes all messages.']];
+    const roles = [['ops', e.name || 'Team Orchestrator', 'Coordinate this team. Follow the user’s goals and approval requirements.']];
     const bots = roles.map(([id, name, role], i) => ({ id, name, role, color: ['#0A0A0A', '#60A5FA', '#A78BFA', '#2EC4B6', '#FF9F43', '#E9FF3B'][i], isMain: i === 0, workspaceId: 'ws_main', runsOn: 'cloud', computer: i === 0 ? 'own' : 'shared', computerStatus: i === 0 ? 'ready' : 'none', ...(i === 0 ? { computerId: e.computerId, computerName: e.name, externalComputer: true } : {}) }));
     const state = { bots, chats: bots.map(b => ({ id: `bot:${b.id}`, kind: 'bot', botIds: [b.id], createdAt: at, typing: [], workspaceId: 'ws_main' })), messages: [], sessions: [], routines: [], host: 'orgo', owner: { name: '' }, workspaces: [{ id: 'ws_main', name: e.purpose, createdAt: at }], workspace: 'ws_main' };
     fs.writeFileSync(target, JSON.stringify(state), { flag: 'wx', mode: 0o600 });
@@ -29,12 +31,25 @@ function initialize(projectRoot = root) {
   return entries;
 }
 
+/** Add a separate team, bound to an existing Orgo computer, at the next free port. */
+function add(id, name, computerId, purpose = name, projectRoot = root) {
+  if (!/^[a-z][a-z0-9-]{0,39}$/.test(id ?? '') || id === 'default') throw Error('Give a team id like sales-team (lowercase letters, digits, dashes).');
+  if (!name) throw Error('Give the team a name.');
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(computerId ?? '')) throw Error('Give the Orgo computer id this team works on (a UUID from orgo.ai).');
+  const entries = initialize(projectRoot);
+  if (entries.some(e => e.id === id)) throw Error(`${id} is already a team here.`);
+  const i = entries.length;
+  entries.push({ id, name, port: 3210 + i, purpose, cdp: 9300 + 1000 * i, computerId, url: `http://localhost:${3210 + i}` });
+  fs.writeFileSync(registryFile(projectRoot), JSON.stringify(entries, null, 2) + '\n', { mode: 0o600 });
+  return initialize(projectRoot);
+}
+
 function connectOrgo() {
   // This user selected computers from the same connected Orgo account. Copy only that credential,
   // into independent namespaces. Preserve any connection already configured for either instance.
   let key;
   try { key = execFileSync('security', ['find-generic-password', '-s', 'Bops Vault', '-a', 'orgo-api-key', '-w'], { stdio: ['ignore', 'pipe', 'ignore'] }).toString().replace(/\n$/, ''); } catch { return; }
-  for (const e of definitions.filter(e => e.id !== 'default')) {
+  for (const e of readRegistry(root).filter(e => e.id !== 'default')) {
     const service = `Bops Vault ${e.id}`;
     try { execFileSync('security', ['find-generic-password', '-s', service, '-a', 'orgo-api-key'], { stdio: 'ignore' }); continue; } catch {}
     execFileSync('security', ['-i'], { input: `add-generic-password -s "${service}" -a "orgo-api-key" -X ${Buffer.from(key).toString('hex')}\n`, stdio: ['pipe', 'ignore', 'pipe'] });
@@ -57,7 +72,8 @@ function enableServices() {
 
 async function main() {
   const command = process.argv[2];
-  if (command === 'setup') { initialize(); connectOrgo(); console.log('Three instance data stores are ready. Existing state was preserved.'); }
+  if (command === 'setup') { initialize(); connectOrgo(); console.log('Instance data stores are ready. Existing state was preserved.'); }
+  else if (command === 'add') { const entries = add(...process.argv.slice(3, 7)); connectOrgo(); const e = entries.at(-1); console.log(`${e.name} is ready on ${e.url}. Start it at login: npm run instances:enable`); }
   else if (command === 'enable') enableServices();
   else if (command === 'serve') {
     const entry = readRegistry(root).find(e => e.id === process.argv[3] && e.id !== 'default');
@@ -71,7 +87,7 @@ async function main() {
       try { await verify(entry); console.log(`${entry.name}: ready — ${entry.url}`); }
       catch (e) { console.log(`${entry.name}: ${e.message}`); process.exitCode = 1; }
     }
-  } else throw Error('Use setup, enable, serve INSTANCE, or status');
+  } else throw Error('Use add ID NAME ORGO_COMPUTER_ID [PURPOSE], setup, enable, serve INSTANCE, or status');
 }
 if (require.main === module) main().catch(e => { console.error(e.message); process.exitCode = 1; });
-module.exports = { initialize, label, plist };
+module.exports = { initialize, add, label, plist };

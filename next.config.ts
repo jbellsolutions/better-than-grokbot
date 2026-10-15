@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 // Apply the same exclusions to the core server trace and route traces.
 const excludedFiles = [
   "./.data/**",
+  "./.cloudroom/**",
   "./.env*",
   "./app/**",
   "./assets/**",

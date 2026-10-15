@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { instanceInfo, registryPath } from "@/lib/server/instance";
+import { validateRegistry } from "@/desktop/instances.cjs";
 
 export const dynamic = "force-dynamic";
 
@@ -8,8 +9,7 @@ export async function GET() {
   let entries: { id: string; name: string; url: string; purpose: string; computerId?: string; port: number }[];
   try {
     entries = JSON.parse(await readFile(registryPath(), "utf8"));
-    const ids = ["default", "ai-guy", "revenue-partners", "chief-sales-officer", "co-founder"];
-    if (!Array.isArray(entries) || entries.length < 3 || entries.length > ids.length || entries.some((e, i) => !e || e.id !== ids[i] || e.port !== 3210 + i || e.url !== `http://localhost:${e.port}`)) throw new Error("Invalid instance registry");
+    validateRegistry(entries);
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== "ENOENT") return Response.json({ error: "The instance registry could not be read." }, { status: 503 });
     return Response.json({ current, instances: [] });

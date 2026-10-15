@@ -11,6 +11,8 @@ export async function register() {
     return;
   }
   const [{ loadOrgoKey }, { startCloud }] = await Promise.all([import("./lib/server/orgo-auth"), import("./lib/server/cloud-tunnel")]);
+  // Bots' turns from Slack are drawn there live from the start, not only once a Bops window polls.
+  void import("./lib/server/slack-render").then((r) => r.startSlackRenderer());
   void loadOrgoKey().then(async () => {
     startCloud();
     if (process.env.BOPS_BUSINESS_RUNTIME === "hermes") {

@@ -13,7 +13,7 @@ const owner = (slot: number): Owner | null => { try {
 catch {
     return null;
 } };
-/** An atomic directory lease spans both coordinator processes. Never reclaim a live remote job on a timer. */
+/** An atomic directory lease spans all coordinator processes. Never reclaim a live remote job on a timer. */
 export function claimScreen(turn: string): number | null {
     mkdirSync(root(), { recursive: true, mode: 0o700 });
     for (let slot = 0; slot < SCREEN_CAPACITY; slot++) {
@@ -39,7 +39,7 @@ export function releaseScreen(turn: string) { for (let slot = 0; slot < SCREEN_C
 } }
 export function capacity() { let used = 0; for (let slot = 0; slot < SCREEN_CAPACITY; slot++)
     if (owner(slot))
-        used++; return { limit: SCREEN_CAPACITY, used, scope: 'both business computers' }; }
+        used++; return { limit: SCREEN_CAPACITY, used, scope: 'all business instances' }; }
 export function ownedScreenTurns() {
     return Array.from({ length: SCREEN_CAPACITY }, (_, slot) => owner(slot))
         .filter((item): item is Owner => item?.instance === instanceId())

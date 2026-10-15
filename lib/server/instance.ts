@@ -16,4 +16,4 @@ export const registryPath = () => process.env.BOPS_INSTANCE_REGISTRY || join(pro
 export const keychainService = () => instanceId() === "default" ? "Bops Vault" : `Bops Vault ${instanceId()}`;
 export const localHome = () => instanceId() === "default" ? join(homedir(), ".bops") : dataPath("local");
 export const localPortBase = () => Number(process.env.BOPS_CDP_PORT_BASE || 9300);
-export const instanceInfo = () => ({ id: instanceId(), name: instanceName(), computerId: instanceComputer() || null });
+export const instanceInfo = () => ({ id: instanceId(), name: instanceName(), computerId: instanceComputer() || null, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone });

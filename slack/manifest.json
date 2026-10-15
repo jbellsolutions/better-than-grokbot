@@ -14,15 +14,19 @@
     "bot_user": {
       "display_name": "Bops",
       "always_online": true
+    },
+    "agent_view": {
+      "agent_description": "Your Bops bots, in Slack: each answers under its own name and picture, shows its work as it goes, and asks before it sends, posts or pays for anything."
     }
   },
   "oauth_config": {
     "redirect_urls": [
-      "https://api.bops.bot/oauth/callback"
+      "https://YOUR-PUBLIC-URL/oauth/callback"
     ],
     "scopes": {
       "bot": [
         "app_mentions:read",
+        "assistant:write",
         "channels:history",
         "channels:join",
         "channels:read",
@@ -30,6 +34,7 @@
         "chat:write.customize",
         "chat:write.public",
         "files:read",
+        "files:write",
         "groups:history",
         "groups:read",
         "im:history",
@@ -48,6 +53,10 @@
   "settings": {
     "org_deploy_enabled": false,
     "socket_mode_enabled": false,
-    "token_rotation_enabled": false
+    "token_rotation_enabled": false,
+    "interactivity": {
+      "is_enabled": true,
+      "request_url": "https://YOUR-PUBLIC-URL/hooks/slack/interactivity"
+    }
   }
 }

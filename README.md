@@ -22,40 +22,43 @@
 
 ## Install with Claude Code or Codex
 
-Drop **https://github.com/jbellsolutions/better-than-grokbot** into Claude Code or Codex and say:
+Paste this repository's link into Claude Code or Codex and say:
 
-> Install Better Than GrokBot on this computer. Follow INSTALL.md, start the app, and walk me through the startup checklist.
+> **Install Better Than GrokBot on this computer. Follow INSTALL.md.**
 
-The coding agent handles installation while you prepare your accounts, business context and agent roles. **[Installation guide and startup checklist](INSTALL.md)**. Aim to be running within 30 minutes with prerequisites and keys ready; timing and provider costs vary. Software download and self-hosting are free.
+It installs and starts the app, asks for your keys one at a time, then asks about your agents: paste
+your own charters, get help writing them, or start with the default team (a lead and a Head of
+Operations) and add agents as you go. It starts as a blank canvas: no agents, data or accounts but
+yours. **[INSTALL.md](INSTALL.md)** has the steps, a startup checklist, and Slack setup.
 
-## Free download and setup
+### By hand
 
-**[Download Better Than GrokBot for free](https://betterthangrokbot.com/download/Better-Than-GrokBot-source.zip)** · [Website and app screenshots](https://betterthangrokbot.com)
+You need Node.js 24 or newer, Git, and an OpenRouter or OpenAI API key.
 
-The download is a source ZIP containing the renamed self-hosted coordinator, README and license. It is not a prebuilt, signed Mac installer. No GitHub account or repository access is needed to download it.
+```bash
+git clone https://github.com/jbellsolutions/better-than-grokbot.git
+cd better-than-grokbot
+npm ci
+cp .env.example .env.local && chmod 600 .env.local
+node scripts/set-key.cjs OPENROUTER_API_KEY     # or OPENAI_API_KEY; the value is hidden as you paste
+npm run build
+npx next start --port 3210 --hostname 127.0.0.1
+```
 
-1. Install **Node.js 24 or newer** and Git. Use a Mac for Mac computer-use features; the optional native app targets Apple silicon.
-2. Download and unzip the source. Open Terminal in the extracted `Better-Than-GrokBot` folder, then run:
+Open **http://localhost:3210**. Add more keys (Orgo, Composio, Honcho, AgentMail…) the same way and
+restart; INSTALL.md says what each one does.
 
-   ```sh
-   npm ci
-   cp .env.example .env.local
-   chmod 600 .env.local
-   ```
+The software is free under **[FSL-1.1-ALv2](LICENSE)**. AI calls, cloud computers, email/phone and
+other connected services bill you separately. The license restricts competing commercial hosted services.
 
-3. Edit `.env.local`. Keep `BOPS_SELF_HOSTED=1`, add your own `OPENROUTER_API_KEY` (or configure the supported OpenAI provider), and select your chat/task models as described in the included README. Cloud computer tasks also need your own `ORGO_API_KEY` and a running Orgo desktop. Optional integrations require their own accounts. Keep keys private.
-4. Start the coordinator:
+### Beta: streaming and Slack
 
-   ```sh
-   npm run dev -- --port 3210
-   ```
-
-5. Open **http://localhost:3210**. Keep the terminal running while you use the app. Configure your agents, their models and their computers in the workspace.
-
-The software is free to download and self-host under **[FSL-1.1-ALv2](LICENSE)**. AI calls, cloud computers, email/phone and other connected services may cost extra. The license restricts competing commercial hosted services.
-
-For the optional native Mac build, follow the README included in the ZIP. Its upstream relay helper currently requires private upstream repository access; the browser coordinator steps above do not require building that helper. Local native builds are unsigned. The ZIP excludes the maintainer's credentials and personal workspace state.
-
+- **Streaming:** replies appear in the chat as they're written, with each tool step shown as it runs
+  and approvals as cards in the conversation. On by default.
+- **Slack:** your bots answer in Slack under their own names and pictures, through your own Slack app
+  (one app for every team on your Mac). They answer direct messages, threads they started, and
+  channels only when @mentioned, and stay out of threads another bot is answering. It needs a public
+  https address for Slack to reach your Mac: [INSTALL.md → Slack (beta)](INSTALL.md#slack-beta).
 
 ## An AI team that gets work done
 
@@ -132,12 +135,12 @@ Everything runs on your Mac except the bots' computers and the providers. `edge/
 
 ## Self-host it
 
-Download the source from [betterthangrokbot.com](https://betterthangrokbot.com/#install). This fork is named **Better Than GrokBot**. Existing `BOPS_*` settings, `ai.orgo.bops.selfhosted` bundle/service IDs, and `~/Library/Application Support/Bops Self-Hosted` remain compatible to preserve saved state and credentials. See [the rename inventory](docs/rebrand.md).
+This fork is named **Better Than GrokBot**. Its settings keep Bops' names (`BOPS_*`, the `ai.orgo.bops.selfhosted` bundle and service IDs, `~/Library/Application Support/Bops Self-Hosted`), so state and credentials from a Bops install carry over.
 
 
 ```bash
 npm install
-cp .env.example .env.local   # fill in at least OPENAI_API_KEY (and ORGO_API_KEY to skip signing in)
+cp .env.example .env.local   # then: node scripts/set-key.cjs OPENROUTER_API_KEY (or OPENAI_API_KEY), and ORGO_API_KEY
 npm run app                  # opens Bops.app, which starts the server on port 3210
 ```
 
@@ -304,8 +307,8 @@ and Screen Recording grants. Restart the affected app after granting Screen Reco
 ### Update notifications and recovery
 
 Run `npm run updates:enable` once on macOS. A separate login service checks hourly, independently
-of Electron, the browser, and Cloudroom. It watches the original repository's main branch and latest
-GitHub release, plus **the paid app's actual feed**, `https://bops.bot/download/latest.json`.
+of Electron and the browser. It watches this repository's main branch and latest GitHub release,
+plus the upstream Bops app's feed, `https://bops.bot/download/latest.json`.
 The first run establishes a baseline; subsequent changes produce a macOS notification (allow
 notifications for Script Editor/osascript if macOS asks). Current versions and release notes appear
 in **Settings → Updates** in both clients, even if system notifications are disabled. Checks resume
@@ -324,34 +327,10 @@ background service first, preserve the current `.data/`, copy a chosen snapshot'
 `openrouter/` into it, then start the service. Keep `.env.local`, the macOS Keychain, and this source
 folder available; a Git checkpoint alone does not contain credentials or saved conversations.
 
-Personal changes are saved on `selfhost/stable` in the private repository
-`https://github.com/jbellsolutions/better-than-grokbot` (`origin`). The original repository is `upstream`,
-with its push URL disabled. The Mac's hourly checker downloads the original `main` into the local
-`upstream/main` remote-tracking ref and syncs it to the private repo's `upstream/main` branch using
-an isolated checkout and existing Mac Git authentication. The live checkout is never rebased by
-the scheduler. This branch sync resumes after login/wake and requires the Mac to be online.
-
-GitHub's **Track upstream Bops** workflow runs hourly and can be run manually. Even while the Mac
-is off, it downloads upstream without executing its code and saves a seven-day source-bundle
-artifact if the private tracking branch is behind. GitHub schedules may be delayed. Its built-in
-read-only token cannot copy upstream workflow changes into a branch; the Mac performs that step
-using existing authentication instead of exporting a broad GitHub token to Actions. The paid-app
-feed is still monitored locally. Neither job merges updates, changes saved team data, rebuilds,
-or restarts the app.
-
-For a reviewed update, first commit and push local changes, take `npm run checkpoint`, then create
-an update branch from `selfhost/stable`. Merge the fetched `upstream/main` there, resolve conflicts,
-and run `npm run test:selfhost`, typechecking and lint. Review the resulting diff before merging
-back to the stable branch and using `npm run app:install` while agents are idle. Keep the existing
-checkpoint available for rollback. Never reset this checkout or auto-pull into the live app.
-
-To save future code changes, commit only source files, then run `git pull --rebase origin
-selfhost/stable` followed by `git push origin selfhost/stable`. Push newly created checkpoint tags
-explicitly. Committed code is backed up on GitHub; new uncommitted edits are not automatically
-saved there. Dotenv keys, `.data`, chats, and app binaries are excluded from Git history. A private
-GitHub release can hold the encrypted recovery DMG and checksum; its recovery key must be kept
-separately in a password manager. Repository collaborators can see source and release assets;
-never upload the key or unencrypted personal state, and invite people only deliberately.
+To update, commit your own changes, take `npm run checkpoint`, then `git pull` this repository on a
+branch, run `npm run test:selfhost`, typechecking and lint, and review the diff before merging and
+rebuilding (`npm run app:install`) while agents are idle. Keep the checkpoint for rollback. Dotenv
+keys, `.data`, chats and app binaries are git-ignored; never commit them.
 
 ### A stopping point that can be recovered on another Mac
 
@@ -369,7 +348,7 @@ On a replacement Apple-silicon Mac:
 1. Open the encrypted DMG in Finder using the matching recovery key. Copy its contents to a private
    folder. Install Node 24, Git, and Tailscale if needed.
 2. Clone `source.bundle` into the desired project folder:
-   `git clone -b selfhost/stable /path/to/source.bundle "$HOME/Bops Open Source"`.
+   `git clone -b <your branch> /path/to/source.bundle better-than-grokbot`.
    Enter it; copy `settings/.env*` into the project, then copy the checkpoint's `state.json` and
    `openrouter/` and `models.json` (if present) into `.data/`. Keep them private. Do **not** restore `deployment/service.json`
    yet; the deployment plists are references and contain paths from the previous Mac.
@@ -437,16 +416,19 @@ imported into Bops. Continuing an old task on a different computer retains its c
 refer to files or URLs that are only on the previous VM. Explicit context/file migration or integration
 with an existing Hermes/Grok agent is a separate operation.
 
-### Separate business instances
+### Separate teams on one Mac
 
-The self-hosted app supports your current team plus independent **AI Guy Go To Market**
-(cold email) and **Revenue Partners** (prospecting) instances. Use the App instance picker
-to switch while retaining each instance’s conversations, profiles and connections.
-See [instance setup and execution status](docs/INSTANCE_SETUP.md).
+Besides your main team, you can run separate teams, each with its own conversations, profiles,
+connections and port (3211 and up), each bound to an existing Orgo computer you choose:
 
-The [go-to-market cold-email experiment plan](docs/GTM_COLD_EMAIL_PLAN.md) covers
-Databox sourcing, verification, deliverability, Instantly, SMTP and replies in a
-Hermes email team with separate role charters, with required ClickUp operating updates and Attio CRM updates.
+```bash
+node scripts/instances.cjs add sales-team "Sales Team" <orgo-computer-id> "Prospecting"
+npm run instances:enable     # start them now and at login
+npm run instances:status
+```
+
+Use the app's instance picker to switch between teams. A team's own settings go in
+`.data/instances/<id>/.env.local`; shared provider identities are not copied between teams.
 
 
 ### Resize columns and manage profiles
@@ -462,13 +444,7 @@ The Business desk's Profiles view has the same management link and a Show hidden
 The team lead stays visible and cannot be deleted. Deletion requires a second confirmation and
 removes that Bops profile's chat, tasks, routines and inboxes. Borrowed Orgo computers remain.
 Imported profiles record a removal marker so source reconciliation does not recreate them after
-restart. Original Grok Bot agents and imported archive records are independent of this removal.
+restart.
 
-**Business desk → Launch checklist** explains the campaign verification holds and the evidence
-needed for each. Prepare verification task fills the Queue form for review; it does not run the
-task or approve a campaign. Provider evidence, exact copy/audience/offer, copy review, delivery
-clearance and the owner's campaign-specific launch decision remain separate requirements.
-
-The registry accepts the three original instances plus Chief Sales Officer and Co-Founder on
-their fixed loopback ports. Rebuilding this checkout only restarts services whose LaunchAgent
+The registry gives each team a fixed loopback port. Rebuilding this checkout only restarts services whose LaunchAgent
 working directory points to this checkout; separately hosted instances are preserved.

@@ -13,6 +13,8 @@ export type Bot = {
   id: BotId;
   name: string;
   role: string;
+  /** Operations can coordinate specialists independently of the workspace orchestrator. */
+  teamRole?: "specialist" | "operations";
   /** OpenRouter model override; unset follows the team default. Independent of the computer. */
   model?: string;
   color: string;
@@ -71,6 +73,8 @@ export type Workspace = {
   id: string;
   name: string;
   createdAt: number;
+  /** Saved sidebar order. Unset follows recent activity; includes hidden conversations. */
+  chatOrder?: string[];
   /** Where its memory lives (lib/server/memory.ts): unset is its own bank; set when it shares another workspace's. */
   memory?: { bank: string; peer: string };
   /** Its part of every bot's email address (sam@<slug>.bops.bot), unique across every Bops install. */
@@ -144,6 +148,8 @@ export type Chat = {
   createdAt: number;
   /** When the user last opened it, for unread dots. */
   readAt?: number;
+  /** Explicitly marked unread; stays set until the user opens or marks the conversation read. */
+  unread?: boolean;
   /** Bots currently writing a reply here. */
   typing: BotId[];
   /** While a bot waits on a teammate's answer before replying: who it's asking (asker → teammate). */
@@ -160,6 +166,16 @@ export type Message = {
   botId?: BotId;
   text: string;
   at: number;
+  /** Client identity makes an uncertain send safe to retry. */
+  requestId?: string;
+  /** The turn stream run that wrote it (lib/server/turn-events.ts): it replaces that run's provisional text. */
+  runId?: string;
+  delivery?: "queued" | "running" | "answered" | "failed";
+  deliveryError?: string;
+  /** A visible link to the agents' actual conversation, mirrored into their chats. */
+  exchange?: { pairId: string; messageId: string };
+  toolCall?: { name: string; status: "done" | "failed" };
+  execution?: { model: string; requestedEffort: Effort; elapsedMs: number };
   /** Threads this message started or reports on; shown as session chips under it. */
   sessionIds?: string[];
   /** Set on a thread's result: a newer result from the same thread replaces it in the chat (the thread keeps the history). */
@@ -243,6 +259,8 @@ export type Session = {
   taskMode?: "headless" | "screen";
   runtime?: "hermes";
   hermesTurn?: string;
+  /** Identity of the private-screen handoff currently awaiting the owner. */
+  hermesHelpId?: string;
   hermesReplyIds?: string[];
   screenSlot?: number;
   queueReason?: string;
@@ -264,6 +282,16 @@ export type Session = {
   chatId: string;
   /** Who kicked it off: the user directly, another bot handing it over, or a routine. */
   sentVia: BotId | "you" | "routine";
+  /** The persisted parent task receives this task's result and can continue autonomously. */
+  delegatedFrom?: string;
+  delegationResults?: string[];
+  /** Durable replies to remote Hermes tool calls, keyed by the worker's call identity. */
+  toolReceipts?: Record<string, string>;
+  /** Public page fetches recorded by the worker, rather than claimed in its answer. */
+  publicReads?: { url: string; text: string; at: number }[];
+  originGoal?: string;
+  coordinationHop?: number;
+  coordinationReviewed?: boolean;
   /** Short label for chips and lists. */
   title: string;
   /** The kickoff message the bot works from, pinned at the top of the thread. */
@@ -307,6 +335,8 @@ export type Session = {
   /** On the Mac: the Codex thread it runs in, and its current turn (to stop it). */
   codexThread?: string;
   codexTurn?: string;
+  /** A Mac turn submission has no confirmed result yet. Keep its host reservation. */
+  macPending?: boolean;
   /** What the bot is doing right now, in a word or two ("searching", "filling a form"), for its cursor caption. */
   activity?: string;
   /** Jev's read of the last answer: is the bot waiting on the user to answer, decide or act? */
@@ -393,7 +423,7 @@ export type Owner = { name: string; about?: string };
 
 export type AppState = {
   /** Runtime identity supplied by the coordinator, not shared between instances. */
-  instance?: { id: string; name: string; computerId: string | null; observeOnly: boolean };
+  instance?: { id: string; name: string; computerId: string | null; observeOnly: boolean; timezone?: string };
   /** Who the bots work for. Empty until set in Settings. */
   owner?: Owner;
   bots: Bot[];
@@ -419,8 +449,15 @@ export type AppState = {
   connecting?: AppConnecting[];
   /** Where the user added bots like a teammate: a Slack channel, a Telegram bot, a Discord bot (lib/server/channels.ts). */
   channels?: ChannelLink[];
+  /**
+   * The user took their own Slack app out of this Bops (lib/server/slack-api.ts). Every Bops on the Mac
+   * shares the app, so the others keep it; here it isn't added back until it's pasted here again.
+   */
+  slackAppOff?: boolean;
   /** App actions a bot wants to take that change something (send, create, pay), waiting for the user. */
   appApprovals?: AppApproval[];
+  /** App actions the user chose "Always allow" for: that bot runs that action in that account without asking. */
+  appAlways?: AppAlways[];
   /** Teams the user keeps apart, and the one they're looking at. */
   workspaces?: Workspace[];
   workspace?: string;
@@ -517,6 +554,8 @@ export type UsageEvent = {
 
 /** The user's Mac as a place bots can work: whether Codex is ready, what's waiting on their OK, and their rules. */
 export type MacState = {
+  /** Owner permission for this computer instance to request work on their Mac. */
+  accessEnabled?: boolean;
   /** Codex is installed, signed in with ChatGPT, and has computer use. */
   ready: boolean;
   /** Why not, in plain words, when it isn't. */
@@ -526,7 +565,7 @@ export type MacState = {
    * (Bops installs it by itself; `installing` while it does), signing in to Codex, or Codex's
    * Computer Use. "elsewhere": this server isn't on the user's Mac, so there's nothing to do here.
    */
-  next?: "codex" | "sign-in" | "computer-use" | "elsewhere";
+  next?: "codex" | "sign-in" | "computer-use" | "elsewhere" | "permission";
   installing?: boolean;
   /** A Codex sign-in is open in the browser, waiting for the user. */
   signingIn?: boolean;
@@ -632,7 +671,18 @@ export const pairCodeLive = (l: Pick<ChannelLink, "owner" | "pairCode" | "pairCo
 export type ChannelPlace = { linkId: string; chat: string; messageId?: string; thread?: string; from?: string };
 
 /** A bot asks before an app action that changes something: the user sees what it is and says yes or no. */
-export type AppApproval = { id: string; botId: string; chatId?: string; sessionId?: string; app: string; action: string; title: string; detail: string; at: number };
+export type AppApproval = {
+  id: string; botId: string; chatId?: string; sessionId?: string; app: string; action: string; title: string; detail: string; at: number;
+  /** The connected account it acts in (an AppAccount id), when it's an app action. */
+  account?: string;
+  /** What it does: changes something, or deletes / can't be undone. */
+  effect?: "write" | "destructive";
+  /** Whether "Always allow" is offered (never for email sends or destructive actions). */
+  allowAlways?: boolean;
+};
+
+/** "Always allow" for one bot, one action, one account. Removing it brings the approval card back. */
+export type AppAlways = { id: string; botId: string; app: string; action: string; account?: string; title: string; at: number; by?: string };
 
 export type MacApproval = {
   id: string;
@@ -642,7 +692,9 @@ export type MacApproval = {
   app?: string;
   /** What's being asked, as Codex put it. */
   message: string;
-  kind: "app" | "command" | "other";
+  kind: "app" | "command" | "permissions" | "other";
+  /** Exact permissions requested by the local worker; owner grants only this request. */
+  requestedPermissions?: Record<string, unknown>;
   at: number;
 };
 

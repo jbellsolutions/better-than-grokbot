@@ -278,16 +278,15 @@ export const orgo = {
   hermes: async (request: Record<string, unknown>) => {
     if (instanceId() === "default" || process.env.BOPS_BUSINESS_RUNTIME !== "hermes") throw new Error("Hermes is not configured for this instance");
     const computerId = process.env.BOPS_ORGO_COMPUTER_ID;
-    if (!computerId || !["submit", "status", "cancel", "snapshot", "history", "files"].includes(String(request.action))) throw new Error("Invalid Hermes bridge request");
-    const python = instanceId() === "ai-guy" ? "/usr/local/lib/hermes-agent/venv/bin/python3" : "/home/hermes/.hermes/hermes-agent/venv/bin/python";
+    if (!computerId || !["submit", "status", "cancel", "snapshot", "history", "files", "tool_result", "resume", "input"].includes(String(request.action))) throw new Error("Invalid Hermes bridge request");
     const payload = Buffer.from(JSON.stringify(request)).toString("base64");
-    const command = `${python} /opt/bops-business/${instanceId()}/business-hermes.py '${payload}'`;
+    const command = `for python in /usr/local/lib/hermes-agent/venv/bin/python3 /home/hermes/.hermes/hermes-agent/venv/bin/python; do if [ -x "$python" ]; then exec "$python" /opt/bops-business/${instanceId()}/business-hermes.py '${payload}'; fi; done; exit 127`;
     const result = await call<{ output: string; exit_code: number }>("POST", `/computers/${computerId}/bash`, { command, timeout: 20 }, 0, undefined, true);
     const line = result.output.split("\n").findLast(l => l.startsWith("BOPS_HERMES="));
     if (!line || result.exit_code !== 0) throw new Error("The Hermes bridge is unavailable on this computer");
     const response = JSON.parse(line.slice(12));
     if (response.error && !response.status) throw new Error(response.error);
-    return response as { cleanupConfirmed?: boolean; status?: string; error?: string; answer?: string; screen?: number; image?: string; contentType?: string; requests?: {id:string;reason:string;requested:number}[]; sessions?: Record<string,unknown>[]; messages?: Record<string,unknown>[]; total?: number; files?: Record<string,unknown>[]; text?: string };
+    return response as { accepted?: boolean; human?: { id: string; kind: 'sign_in' | 'two_factor' | 'captcha' | 'error'; message: string }; cleanupConfirmed?: boolean; status?: string; error?: string; answer?: string; screen?: number; image?: string; contentType?: string; publicReads?: { url: string; text: string; at: number }[]; requests?: {id:string;reason:string;requested:number}[]; toolCalls?: { id: string; name: string; arguments: Record<string, unknown> }[]; sessions?: Record<string,unknown>[]; messages?: Record<string,unknown>[]; total?: number; files?: Record<string,unknown>[]; text?: string };
   },
 
   bash: async (computerId: string, command: string, timeout = 60, signal?: AbortSignal) =>

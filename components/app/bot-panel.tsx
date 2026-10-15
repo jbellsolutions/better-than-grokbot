@@ -1,8 +1,11 @@
 "use client";
+
 import { ModelSettings } from "./model-settings";
+import { routineStatus, workStatus } from "@/lib/work-status";
+import { DeleteAgentDialog } from "./agent-card-actions";
 
 import { useEffect, useState } from "react";
-import { botChatId, live, sharesComputer, workBot, workspaceOf, type AppState, type Bot, type Routine, type Session } from "@/lib/types";
+import { botChatId, sharesComputer, workBot, workspaceOf, type AppState, type Bot, type Routine, type Session } from "@/lib/types";
 import { mainOwnShort, ownComputerShort } from "@/lib/orgo-plans";
 import { BotMemory } from "./bot-memory";
 import { ComputerSummary } from "./computer";
@@ -14,6 +17,9 @@ import { botWash, post } from "./ui";
 import { accountTitle, AppLogo, botApps } from "./apps";
 import { WhereToFind } from "./channels";
 import { AccountComputers } from "./account-computers";
+import { AgentTools } from "./agent-tools";
+import { RoutineEditor } from "./routine-editor";
+import { leadsTeam } from "@/lib/conversations";
 import { BOOK_A_CALL } from "@/lib/links";
 
 /** The parts of a bot's profile. Its computer has a tab of its own (see panel-tabs.tsx). */
@@ -76,6 +82,28 @@ export function BotPanel({
 
 /* ---------------- Details: the bot's contact card ---------------- */
 
+function TeamRole({ bot }: { bot: Bot }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const save = async (teamRole: string) => {
+    setBusy(true); setError("");
+    try {
+      const res = await post("/api/bots", { botId: bot.id, teamRole }, "PATCH");
+      if (!res.ok) throw Error((await res.json()).error || "Could not change team role.");
+    } catch (e) { setError((e as Error).message); }
+    finally { setBusy(false); }
+  };
+  return <label className="flex w-full flex-col gap-1 rounded-2xl bg-white/70 p-3 text-[12px] text-[#6B6B6B]">
+    Team role
+    <select aria-label={`Team role for ${bot.name}`} value={bot.teamRole ?? "specialist"} disabled={busy} onChange={e => void save(e.target.value)} className="rounded-lg bg-white p-2 text-[13px] text-ink">
+      <option value="specialist">Specialist</option>
+      <option value="operations">Head of operations</option>
+    </select>
+    <span>The head of operations orchestrates the team: creates and removes specialists, delegates work, and manages their tasks and routines.</span>
+    {error && <span role="alert" className="text-[#B42318]">{error}</span>}
+  </label>;
+}
+
 const EFFORT_HINT: Record<string, string> = {
   auto: "Thinks hard on tough tasks, quick on simple ones",
   low: "Fastest; fine for quick lookups",
@@ -98,8 +126,8 @@ function Details({
   onOpenVault: () => void;
   onOpenComputer: (botId: string) => void;
 }) {
-  const routines = state.routines.filter((r) => r.botId === b.id);
-  const running = state.sessions.filter((s) => s.botId === b.id && live(s)).length;
+  const routines = state.routines.filter(r => r.botId === b.id || leadsTeam(b) && workspaceOf(state.bots.find(x => x.id === r.botId)) === workspaceOf(b));
+  const running = state.sessions.filter((s) => s.botId === b.id && workStatus(s).canStop).length;
   // The workspace's number belongs to its main bot; the other bots are reached through it.
   const line = state.workspaces?.find((w) => w.id === workspaceOf(b))?.line;
   const main = state.bots.find((x) => x.isMain && workspaceOf(x) === workspaceOf(b));
@@ -124,8 +152,9 @@ function Details({
         <div className="text-[13px] font-medium leading-4 text-[#3A3A38]">{b.isMain ? `${b.role} · runs the team` : `${b.role} · Better Than GrokBot team`}</div>
       </div>
       <button onClick={() => setEditing(!editing)} className="text-[12px] font-medium underline underline-offset-2">{editing ? "Close editor" : "Edit name and role"}</button>
-      {editing && <ProfileEditor key={b.id} bot={b} onDone={() => setEditing(false)} />}
+      {editing && <ProfileEditor key={`editor-${b.id}`} bot={b} onDone={() => setEditing(false)} />}
       <ProfileManagement key={`manage-${b.id}`} bot={b} />
+      {!b.isMain && <TeamRole key={`role-${b.id}`} bot={b} />}
       <div className="flex gap-3">
         {/* With a number, it texts the bot from Messages (it answers by text, as it would anyone); without one, its chat here. */}
         <ActionButton
@@ -149,7 +178,7 @@ function Details({
         </ActionButton>
       </div>
       {tabs}
-      <ModelSettings key={b.id} bot={b} className={glass} />
+      <ModelSettings key={`model-${b.id}`} bot={b} className={glass} />
 
       <div className={`flex w-full flex-col rounded-2xl ${glass}`}>
         <Field
@@ -167,6 +196,8 @@ function Details({
       <ContactSetup bot={b} />
       <ComputerSummary state={state} bot={b} className={`w-full ${glass}`} onOpen={() => onOpenComputer(b.id)} />
       <Uses state={state} bot={b} onOpenVault={onOpenVault} className={glass} />
+      <AlwaysAllowed state={state} bot={b} className={glass} />
+      <AgentTools key={`tools-${b.id}`} bot={b} />
 
       <div className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 ${glass}`}>
         <div className="flex min-w-0 flex-1 flex-col">
@@ -206,7 +237,7 @@ function Details({
         </div>
       </div>
 
-      {state.host !== "mac" && <AccountComputers key={b.id} state={state} bot={b} className={glass} />}
+      {state.host !== "mac" && <AccountComputers key={`computer-${b.id}`} state={state} bot={b} className={glass} />}
       {!b.isMain && b.computerId && !b.externalComputer && <ComputerChoice state={state} bot={b} className={glass} />}
 
       <div className={`flex w-full flex-col rounded-2xl ${glass}`}>
@@ -219,8 +250,9 @@ function Details({
             Nothing scheduled. Try texting {b.name}: &ldquo;every weekday at 9, {b.isMain ? "send me a summary of what the team did" : "check on anything waiting"}.&rdquo;
           </div>
         ) : (
-          routines.map((r, i) => <RoutineRow key={r.id} routine={r} last={i === routines.length - 1} />)
+          routines.map((r, i) => <RoutineRow key={r.id} routine={r} owner={r.botId !== b.id ? state.bots.find(x => x.id === r.botId)?.name : undefined} last={i === routines.length - 1} />)
         )}
+        <RoutineEditor key={b.id} bot={b} timezone={state.instance?.timezone} />
       </div>
 
       <WhereToFind state={state} bot={b} />
@@ -234,7 +266,7 @@ function Details({
           disabled={!running}
           className={`flex-1 rounded-[14px] px-4 py-[11px] text-left text-[14px] leading-[18px] text-[#B42318] disabled:text-[#C9C9C6] ${glass}`}
         >
-          {running ? `Pause ${b.name} · ${running} running` : `${b.name} is idle`}
+          {running ? `Stop ${b.name} · ${running} active task${running === 1 ? "" : "s"}` : `${b.name} has no active tasks`}
         </button>
       </div>
 
@@ -332,48 +364,17 @@ function ProfileManagement({ bot: b }: { bot: Bot }) {
         finally { setBusy(false); }
       }}>{busy ? "Saving…" : b.hidden ? `Show ${b.name}` : `Hide ${b.name}`}</button>
       {error && <p role="alert" className="text-red-700">{error}</p>}
-      <DeleteBot bot={b} />
+      {b.teamRole === "operations" ? <p className="text-xs text-[#6B6B6B]">This team keeps a Head of Operations. Assign another agent that role before deleting this one.</p> : <DeleteBot bot={b} />}
     </div>}
   </details>;
 }
 
 function DeleteBot({ bot: b }: { bot: Bot }) {
   const [sure, setSure] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const remove = async () => {
-    setBusy(true);
-    const res = await post("/api/bots", { botId: b.id }, "DELETE");
-    if (!res.ok) {
-      setError(((await res.json()) as { error?: string }).error ?? "Couldn't delete it");
-      setBusy(false);
-    }
-  };
-  if (!sure)
-    return (
-      <button onClick={() => setSure(true)} className="self-center py-1 text-[13px] text-[#9A9A98] hover:text-[#B42318]">
-        Delete {b.name}
-      </button>
-    );
-  return (
-    <div className="flex w-full flex-col gap-2.5 rounded-2xl bg-[#FEF3F2] px-4 py-3 shadow-[0_0_0_1px_#FECDCA]">
-      <span className="text-[13px] leading-[18px] text-[#3A3A38]">
-        {sharesComputer(b) || b.externalComputer
-          ? `Delete ${b.name}? Its chat, threads and routines go with it; the computer it works on stays. This can't be undone.`
-          : `Delete ${b.name}? Its computer, chat, threads and routines go with it. This can't be undone.`}
-      </span>
-      {b.catalogId && <span className="text-xs text-[#6B6B6B]">This removes the Bops profile. Imported source records stay in the archive; the original agent in Grok Bot is unchanged.</span>}
-      {error && <span className="text-[12px] text-[#B42318]">{error}</span>}
-      <div className="flex gap-2">
-        <button onClick={() => void remove()} disabled={busy} className="rounded-full bg-[#B42318] px-3.5 py-1.5 text-[13px] font-semibold text-white disabled:opacity-60">
-          {busy ? "Deleting…" : `Delete ${b.name}`}
-        </button>
-        <button onClick={() => setSure(false)} disabled={busy} className="rounded-full px-3.5 py-1.5 text-[13px] font-medium shadow-[0_0_0_1px_#E6E6E3]">
-          Keep
-        </button>
-      </div>
-    </div>
-  );
+  return <>
+    <button onClick={() => setSure(true)} className="self-center py-1 text-[13px] text-[#9A9A98] hover:text-[#B42318]">Delete {b.name}</button>
+    {sure && <DeleteAgentDialog bot={b} onClose={() => setSure(false)} />}
+  </>;
 }
 
 function ActionButton({ label, onClick, disabled, children }: { label: string; onClick: () => void; disabled?: boolean; children: React.ReactNode }) {
@@ -469,21 +470,23 @@ function Field({ label, value, empty }: { label: string; value?: string; empty: 
   );
 }
 
-function RoutineRow({ routine: r, last }: { routine: Routine; last: boolean }) {
+function RoutineRow({ routine: r, last, owner }: { routine: Routine; last: boolean; owner?: string }) {
+  const status = routineStatus(r);
   return (
     <div className={`group flex items-center gap-2.5 px-4 py-[9px] ${last ? "" : "border-b border-black/[0.05]"}`}>
       <div className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-[14px] leading-[18px]">{r.title}</span>
+        <span className="truncate text-[14px] leading-[18px]">{owner ? `${owner} · ` : ""}{r.title}</span>
         <span className="text-[12px] leading-4 text-[#6B6B6B]">
           {describe(r)}
           {r.nextRunAt && r.enabled ? ` · next ${new Date(r.nextRunAt).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })}` : ""}
         </span>
+        <span className="text-[12px] leading-4 text-[#6B6B6B]">{[status.label, status.detail].filter(Boolean).join(" · ")}</span>
       </div>
       <button onClick={() => void post("/api/routines", { id: r.id }, "DELETE")} className="hidden text-[12px] text-[#9A9A98] hover:text-[#B42318] group-hover:block">
         Delete
       </button>
       {r.schedule.kind === "once" && !r.enabled ? (
-        <span className="rounded-full bg-[#F2F2F0] px-2.5 py-0.5 text-[12px] leading-4 text-[#3A3A38]">Done</span>
+        <span className="rounded-full bg-[#F2F2F0] px-2.5 py-0.5 text-[12px] leading-4 text-[#3A3A38]">{status.label}</span>
       ) : (
         <button
           onClick={() => void post("/api/routines", { id: r.id, enabled: !r.enabled }, "PATCH")}
@@ -540,6 +543,26 @@ function Uses({ state, bot: b, onOpenVault, className }: { state: AppState; bot:
       </div>
       <span className="shrink-0 text-[12px] font-medium leading-4 text-ink">Manage in Vault ›</span>
     </button>
+  );
+}
+
+/** App actions this bot does without asking, because the user chose "Always allow". Each can be taken back. */
+function AlwaysAllowed({ state, bot: b, className }: { state: AppState; bot: Bot; className: string }) {
+  const rules = (state.appAlways ?? []).filter((r) => r.botId === b.id);
+  if (!rules.length) return null;
+  return (
+    <div className={`flex flex-col gap-1.5 rounded-2xl px-4 py-3 ${className}`}>
+      <span className="text-[13px] font-semibold leading-4">Always allowed</span>
+      {rules.map((r) => (
+        <div key={r.id} className="flex items-center gap-2 text-[12.5px] leading-4">
+          <AppLogo app={r.app} name={r.app} size={18} />
+          <span className="min-w-0 flex-1 truncate" title={r.action}>{r.title}</span>
+          <button onClick={() => void post(`/api/apps/approvals?always=${encodeURIComponent(r.id)}`, {}, "DELETE")} className="shrink-0 font-medium text-ink hover:underline">
+            Ask again
+          </button>
+        </div>
+      ))}
+    </div>
   );
 }
 

@@ -61,12 +61,13 @@ export function renameBot(botId: string, name: string): { ok: true } | { error: 
  * first task, if the user's Orgo plan has room for one. If it hasn't, the bot works on the main bot's,
  * and `note` says why. Names are unique within a workspace; ids across all of them.
  */
-export async function createBot(name: string, role?: string, workspaceId?: string, ownComputer = false): Promise<{ botId: string; chatId: string; note?: string } | { error: string }> {
+export async function createBot(name: string, role?: string, workspaceId?: string, ownComputer = false, teamRole?: "operations"): Promise<{ botId: string; chatId: string; note?: string } | { error: string }> {
   const clean = name.trim();
   if (!clean) return { error: "name required" };
   const ws = workspaceId ?? getState().workspace;
   const team = workspaceOf({ workspaceId: ws });
   const noRoom = ownComputer ? await noOwnComputer(team) : null;
+  if (teamRole === "operations" && getState().bots.some(b => workspaceOf(b) === team && b.teamRole === "operations")) return { error: "This team already has a head of operations." };
   if (getState().bots.some((b) => workspaceOf(b) === team && b.name.toLowerCase() === clean.toLowerCase())) return { error: "a bot with that name exists" };
   const botId = freeBotId(clean);
   update((s) => {
@@ -76,6 +77,7 @@ export async function createBot(name: string, role?: string, workspaceId?: strin
       role: role?.trim() || "Generalist",
       color: COLORS[(s.bots.length - 1) % COLORS.length],
       isMain: false,
+      teamRole,
       computerStatus: "none",
       computer: ownComputer && !noRoom ? "own" : "shared",
       workspaceId: ws,

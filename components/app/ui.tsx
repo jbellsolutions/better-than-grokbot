@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { DISPLAYS, live, MAIN_WORKSPACE, workspaceOf, type AppState, type Bot, type Chat, type Logo, type Session } from "@/lib/types";
+import { DISPLAYS, MAIN_WORKSPACE, workspaceOf, type AppState, type Bot, type Chat, type Logo, type Session } from "@/lib/types";
 import { Mascot, Spinner } from "./mascot";
+import { workStatus } from "@/lib/work-status";
 export { botBezel, botOnInk, botWash, DESKTOP_BG } from "@/lib/look";
 
 /* Shared helpers and small pieces used across the app. Values follow the Paper designs. */
@@ -39,16 +40,7 @@ export const clockTime = (t: number) => new Date(t).toLocaleTimeString(undefined
 
 /** A thread needs the user when its screen hit something only they can get past, its bot is waiting on their answer (Jev decides), or it hit a problem they haven't answered. */
 export function needsYou(s: Session) {
-  // Dismissed, or a newer thread has the job: it never asks again.
-  if (s.dismissed || s.replacedBy) return false;
-  // It can't start until the user says where (their Mac or the cloud), whatever they've said since.
-  if (s.askWhere && live(s)) return true;
-  const lastUser = [...s.replies].reverse().find((r) => r.role === "user");
-  const lastBot = [...s.replies].reverse().find((r) => r.role === "bot");
-  if (lastUser && (!lastBot || lastUser.at > lastBot.at)) return false;
-  if (live(s)) return !!s.blocker;
-  if (s.status === "done") return !!s.blocker || (s.waitingOnYou ?? (s.answer ?? "").trim().endsWith("?"));
-  return s.status === "failed" && !!s.error && !/stopped by you|paused/i.test(s.error);
+  return workStatus(s).attention;
 }
 
 export function useAppState() {
@@ -58,6 +50,9 @@ export function useAppState() {
     let stop = false;
     let sent = 0;
     let applied = 0;
+    let streaming = false;
+    let inFlight: Promise<void> | undefined;
+    let again = false;
     const fetchState = async () => {
       const seq = ++sent;
       try {
@@ -66,7 +61,8 @@ export function useAppState() {
         if (!res.ok) throw new Error("Instance unavailable");
         const json = (await res.json()) as { version: number; state?: AppState; instance?: { id: string } };
         if (stop) return;
-        const expected = window.bopsInstances?.id ?? ({ "3211": "ai-guy", "3212": "revenue-partners" } as Record<string, string>)[window.location.port] ?? "default";
+        // The native app knows which team a window is for; a browser tab takes the one its address serves.
+        const expected = window.bopsInstances?.id ?? json.instance?.id ?? "default";
         if (json.instance?.id && json.instance.id !== expected) { setState(null); return; }
         if (expected !== "default" && !json.instance) { setState(null); return; }
         if (seq < applied) return; // a newer fetch already landed
@@ -79,15 +75,36 @@ export function useAppState() {
         /* retry next tick */
       }
     };
-    const tick = async () => {
-      await fetchState();
-      if (!stop) setTimeout(tick, 900);
+    // A burst of tools produces one fetch at a time; an event during it schedules a fresh one.
+    const refresh = () => {
+      if (inFlight) { again = true; return inFlight; }
+      inFlight = (async () => {
+        do { again = false; await fetchState(); } while (again && !stop);
+      })().finally(() => { inFlight = undefined; });
+      return inFlight;
     };
-    refreshers.add(fetchState);
+    const events = new EventSource("/api/state/events");
+    events.onopen = () => { streaming = true; };
+    events.onerror = () => {
+      streaming = false;
+      clearTimeout(timer);
+      if (!stop) timer = setTimeout(tick, 900);
+    };
+    events.onmessage = event => {
+      if (Number(event.data) !== version.current) void refresh();
+    };
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = async () => {
+      await refresh();
+      if (!stop) timer = setTimeout(tick, streaming ? 15000 : 900);
+    };
+    refreshers.add(refresh);
     void tick();
     return () => {
       stop = true;
-      refreshers.delete(fetchState);
+      clearTimeout(timer);
+      events.close();
+      refreshers.delete(refresh);
     };
   }, []);
   return state;
@@ -109,15 +126,16 @@ export function chatName(c: Chat, bots: Bot[]) {
 }
 
 export function StatusIcon({ session: s, size = 13, dark }: { session: Session; size?: number; dark?: boolean }) {
-  // Each state says what it means on hover (the tooltip layer reads data-tip).
-  const tip = s.askWhere && live(s) ? "Waiting for you: your Mac or the cloud?" : live(s) ? "Working on it" : needsYou(s) ? "Needs you" : s.status === "done" ? "Done" : `Didn't finish${s.error ? `: ${s.error.slice(0, 80)}` : ""}`;
-  const icon = live(s) && !(s.askWhere && needsYou(s)) ? (
-    <Spinner size={size} color={dark ? "#0A0A0A" : "#3A3A38"} />
-  ) : needsYou(s) ? (
+  const status = workStatus(s);
+  const tip = [status.text, status.resourceWarning].filter(Boolean).join(" · ");
+  const icon = status.attention ? (
     <span className="block rounded-full bg-highlighter shadow-[0_0_0_1.5px_#0A0A0A]" style={{ width: size - 3, height: size - 3 }} />
-  ) : s.status === "done" ? (
+  ) : status.kind === "running" || status.kind === "starting" ? (
+    <Spinner size={size} color={dark ? "#0A0A0A" : "#3A3A38"} />
+  ) : status.kind === "ended" || status.kind === "queued" ? (
     <svg width={size} height={size} viewBox="0 0 14 14" className="block">
-      <path d="M3 7.5l2.5 2.5L11 4.5" fill="none" stroke="#2BB673" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="7" cy="7" r="4.5" fill="none" stroke="#9A9A98" strokeWidth="1.3" />
+      <path d="M7 4v3l2 1" fill="none" stroke="#9A9A98" strokeWidth="1.3" strokeLinecap="round" />
     </svg>
   ) : (
     <svg width={size} height={size} viewBox="0 0 14 14" className="block">
@@ -125,7 +143,7 @@ export function StatusIcon({ session: s, size = 13, dark }: { session: Session; 
     </svg>
   );
   return (
-    <span data-tip={tip} className="flex shrink-0 items-center justify-center">
+    <span role="img" aria-label={tip} data-tip={tip} className="flex shrink-0 items-center justify-center">
       {icon}
     </span>
   );

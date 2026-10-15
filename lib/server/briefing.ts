@@ -83,7 +83,7 @@ export async function computerBriefing(botId: string, opts: { thread?: string } 
   const recent = mine
     .filter((s) => !live(s) && s.endedAt && Date.now() - s.endedAt < 30 * 60_000)
     .slice(-3)
-    .map((s) => `"${s.title}" (${s.status === "done" ? "done" : "didn't finish"})`);
+    .map((s) => `"${s.title}" (task ID ${s.id}, ${s.status === "done" ? "done" : "didn't finish"})`);
 
   const ownersMac = await macBriefing(botId);
   return [
@@ -147,13 +147,13 @@ export function teamBriefing(mainId: string) {
   const lines = others.map((b) => {
     const mine = state.sessions.filter((s) => s.botId === b.id);
     const running = mine.filter(live);
-    const doing = running.map((s) => `"${s.title}" (${s.status === "queued" ? "up next" : (s.activity ?? "working")}, ${where(s)}${s.blocker ? `, stuck: needs ${owner}, ${BLOCKER_LABEL[s.blocker]}` : ""})`);
+    const doing = running.map((s) => `"${s.title}" (task ID ${s.id}, ${s.status === "queued" ? "up next" : (s.activity ?? "working")}, ${where(s)}${s.blocker ? `, stuck: needs ${owner}, ${BLOCKER_LABEL[s.blocker]}` : ""})`);
     const alerts = (state.watches ?? []).filter((w) => w.botId === b.id && w.alert).map((w) => `heads-up on ${w.site}: "${w.alert!.text}"`);
     const watching = (state.watches ?? []).filter((w) => w.botId === b.id).map((w) => w.site);
     const done = mine
       .filter((s) => !live(s) && s.endedAt && now - s.endedAt < 60 * 60_000)
       .slice(-2)
-      .map((s) => `"${s.title}" (${s.status === "done" ? "done" : "didn't finish"})`);
+      .map((s) => `"${s.title}" (task ID ${s.id}, ${s.status === "done" ? "done" : "didn't finish"})`);
     // A bot that shares works on the main bot's computer (workComputer); it has none of its own.
     const c = workComputer(b);
     const computer = c.id !== b.id ? "Works on your computer." : c.computerStatus === "ready" ? "" : c.computerStatus === "cloning" ? "Its computer is being set up." : "No computer yet.";

@@ -1,10 +1,13 @@
 import { createRoutine, deleteRoutine, setRoutineEnabled } from "@/lib/server/routines";
-import type { Schedule } from "@/lib/types";
+import type { Schedule, Routine } from "@/lib/types";
 
 export async function POST(request: Request) {
-  const { botId, title, goal, schedule } = (await request.json()) as { botId?: string; title?: string; goal?: string; schedule?: Schedule };
+  const { botId, title, goal, schedule, where, reminder } = (await request.json()) as { botId?: string; title?: string; goal?: string; schedule?: Schedule; where?: Routine["where"]; reminder?: string };
   if (!botId || !goal || !schedule) return Response.json({ error: "botId, goal and schedule required" }, { status: 400 });
-  return Response.json(createRoutine(botId, title || goal.slice(0, 40), goal, schedule));
+  if (typeof goal !== "string" || title !== undefined && typeof title !== "string" || reminder !== undefined && typeof reminder !== "string") return Response.json({ error: "Use text for the routine's title, goal and reminder." }, { status: 400 });
+  if (where !== undefined && !["auto", "mac", "cloud"].includes(where)) return Response.json({ error: "Invalid task location." }, { status: 400 });
+  try { return Response.json(createRoutine(botId, title || goal.slice(0, 40), goal, schedule, { where, reminder })); }
+  catch (e) { return Response.json({ error: (e as Error).message }, { status: 400 }); }
 }
 
 export async function PATCH(request: Request) {

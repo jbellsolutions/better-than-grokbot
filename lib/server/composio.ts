@@ -1,10 +1,11 @@
 import "server-only";
 import { execFile, execFileSync } from "node:child_process";
-import { randomBytes, timingSafeEqual } from "node:crypto";
+import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { Composio } from "@composio/core";
 import { live as running, type AppAccount, type AppApproval, type AppConnecting, type AppLevel, type Bot } from "@/lib/types";
 import { cloudOn, cloudProxy, cloudSession, cloudSessionNow, cloudUrl } from "./cloud";
 import { lowRisk } from "./judgment";
+import { decided, interruptApp, noteOutcome } from "./interrupts";
 import { addMessage, bot, getState, id, installId, ownerName, session as threadOf, update } from "./store";
 
 /**
@@ -34,9 +35,10 @@ export const composioOn = () => (cloudOn() ? !!cloudSessionNow()?.composio : !!p
  * Bops' public address: the "connected" page after an app's sign-in, OAuth callbacks, and the bots'
  * pictures (Slack's icon_url, Telegram's and Discord's profile pictures). Signed in with Orgo, Bops
  * Cloud's (CloudSession.publicUrl: it serves /connected, /oauth/callback, /mascot/* and /brand/*);
- * self-hosted, BOPS_PUBLIC_URL (the self-hoster's front door, edge/), else api.bops.bot.
+ * self-hosted, BOPS_PUBLIC_URL (the self-hoster's own front door, edge/). Empty when it isn't set:
+ * then sign-ins end on Composio's page and the bots keep the services' own pictures.
  */
-export const publicUrl = () => (cloudOn() ? (cloudSessionNow()?.publicUrl ?? cloudUrl()) : process.env.BOPS_PUBLIC_URL || "https://api.bops.bot").replace(/\/+$/, "");
+export const publicUrl = () => (cloudOn() ? (cloudSessionNow()?.publicUrl ?? cloudUrl()) : process.env.BOPS_PUBLIC_URL || "").replace(/\/+$/, "");
 
 type ToolInfo = { tags: string[]; name: string; app?: string };
 /** How Composio is reached: through Bops Cloud (signed in with Orgo) or directly (self-hosted). The catalog differs. */
@@ -199,8 +201,8 @@ export async function connectApp(app: string, label?: string, replaces?: string,
   }
   // Afterwards the browser lands on Bops' own "connected" page, not Composio's (Bops Cloud's, signed in with Orgo).
   if (cloudOn()) await cloudSession();
-  const callbackUrl = `${publicUrl()}/connected?app=${encodeURIComponent(appName)}`;
-  const req = await cx().connectedAccounts.link(userId(), await authConfigFor(app), { allowMultiple: true, callbackUrl });
+  const callbackUrl = publicUrl() ? `${publicUrl()}/connected?app=${encodeURIComponent(appName)}` : undefined;
+  const req = await cx().connectedAccounts.link(userId(), await authConfigFor(app), { allowMultiple: true, ...(callbackUrl ? { callbackUrl } : {}) });
   const waitId = req.id;
   update((s) => {
     s.connecting = (s.connecting ?? []).filter((c) => !(c.app === app && c.status === "failed"));
@@ -257,7 +259,9 @@ function dropAccount(s: ReturnType<typeof getState>, accountId: string) {
 
 /** Disconnect an account: Composio forgets its tokens, and no bot can use it any more. */
 export async function disconnectAccount(accountId: string) {
-  if (!accountId.startsWith("open:")) await cx().connectedAccounts.delete(accountId).catch(() => null);
+  // Our own Slack app is shared by every Bops on this Mac: taken out of this one only (its credentials stay for the others).
+  if (accountId.startsWith("slackapp:")) update((s) => void (s.slackAppOff = true));
+  else if (!accountId.startsWith("open:")) await cx().connectedAccounts.delete(accountId).catch(() => null);
   update((s) => dropAccount(s, accountId));
 }
 
@@ -338,8 +342,9 @@ export async function syncApps() {
     for (const a of s.accounts ?? []) if (found.has(a.id)) a.status = found.get(a.id)!.status;
     for (const a of s.accounts ?? []) if (named.has(a.id)) a.name = named.get(a.id);
     // Gone from Composio, or signed out with no bot using it (nothing to sign back in for): off the list.
+    // (Not the user's own Slack app: Bops holds its token, not Composio. slack-api.ts)
     for (const a of [...(s.accounts ?? [])])
-      if (!a.id.startsWith("open:") && (!found.has(a.id) || (a.status === "expired" && !a.label && !s.bots.some((b) => b.access?.[a.id])))) dropAccount(s, a.id);
+      if (!a.id.startsWith("open:") && !a.id.startsWith("slackapp:") && (!found.has(a.id) || (a.status === "expired" && !a.label && !s.bots.some((b) => b.access?.[a.id])))) dropAccount(s, a.id);
     // Two syncs at once (the Vault opening twice) find the same new accounts: add each once.
     for (const a of added) if (!s.accounts?.some((x) => x.id === a.id)) (s.accounts ??= []).push(a);
   });
@@ -547,20 +552,30 @@ export async function runAppAction(
   };
   if (reads) return run();
   const destructive = info.tags.includes("destructiveHint");
+  const chatOf = () => where.chatId ?? (where.sessionId ? getState().sessions.find((x) => x.id === where.sessionId)?.chatId : undefined);
+  // The user said "Always allow" for this bot, this action, this account (never a destructive one).
+  if (!destructive && alwaysAllowed(botId, action, account.id)) {
+    const out = await run();
+    const chatId = chatOf();
+    if (chatId && !out.startsWith("Failed")) addMessage({ chatId, role: "system", text: `${b.name}: ${info.name} in ${where_} · you always allow this` });
+    return out;
+  }
   // Low-stakes and easy to undo, only touching the user's own things (marking read, a label, an event
   // only they attend): done without asking, and said so in the chat. Never anything that reaches
   // someone else, deletes, or costs money (Jev, strict; if it can't tell, the user is asked).
   if (!destructive && (await lowRisk(`${info.name} in ${where_}`, describe(args)))) {
     const out = await run();
-    const chatId = where.chatId ?? (where.sessionId ? getState().sessions.find((x) => x.id === where.sessionId)?.chatId : undefined);
+    const chatId = chatOf();
     if (chatId && !out.startsWith("Failed")) addMessage({ chatId, role: "system", text: `${b.name}: ${info.name} in ${where_} · low risk, so didn't ask` });
     return out;
   }
 
-  const ask = askOwner({ botId, app, action, title: `${info.name} in ${where_}`, detail: describe(args), ...where }).then(async (yes) => {
+  const decision = askOwner({ botId, app, action, title: `${info.name} in ${where_}`, detail: describe(args), account: account.id, effect: destructive ? "destructive" : "write", allowAlways: !destructive, ...where });
+  const ask = decision.then(async (yes) => {
     if (!yes) return `Not approved: ${ownerName()} said no. Don't do it.`;
     return run();
   });
+  noteOutcome(decision.approvalId, ask);
   if (onAsk) {
     onAsk(ask);
     return `This needs ${ownerName()}'s approval first: ${info.name} in ${where_}. Bops is showing them the details. Tell them in one short line, and don't call it again.`;
@@ -597,19 +612,46 @@ export const composioUser = userId;
 
 /* ---------------- Asking the user ---------------- */
 
+/**
+ * Ask the user: a card in the app (and, from Slack, a card there), and an AG-UI interrupt in the run
+ * that asked (lib/server/interrupts.ts). The id is a UUID, so its interrupt id is 32 hex.
+ */
 export function askOwner(a: Omit<AppApproval, "id" | "at">) {
-  const approval: AppApproval = { ...a, id: id("apr"), at: Date.now() };
+  const approval: AppApproval = { ...a, id: randomUUID(), at: Date.now() };
+  const decision = new Promise<boolean>((resolve) => live.waiting.set(approval.id, resolve));
   update((s) => (s.appApprovals ??= []).push(approval));
-  return new Promise<boolean>((resolve) => live.waiting.set(approval.id, resolve));
+  interruptApp(approval);
+  return Object.assign(decision, { approvalId: approval.id });
 }
 
-/** The user's answer to an app approval. */
-export function answerApp(approvalId: string, yes: boolean) {
+/**
+ * The user's answer to an app approval: the one place a decision is applied, from the app's card,
+ * Slack's card or an AG-UI resume. "Always" (only where the approval offers it) also remembers this
+ * bot, action and account, so it isn't asked again until the user removes it. False when the
+ * approval isn't waiting any more (already answered).
+ */
+export function answerApp(approvalId: string, yes: boolean, opts: { always?: boolean; by?: string } = {}) {
+  const a = getState().appApprovals?.find((x) => x.id === approvalId);
+  const always = yes && !!opts.always && !!a?.allowAlways && a.effect !== "destructive" && a.app !== "email";
   update((s) => {
     s.appApprovals = (s.appApprovals ?? []).filter((x) => x.id !== approvalId);
+    if (always && a && !alwaysAllowed(a.botId, a.action, a.account))
+      (s.appAlways ??= []).push({ id: id("alw"), botId: a.botId, app: a.app, action: a.action, account: a.account, title: a.title, at: Date.now(), by: opts.by });
   });
-  live.waiting.get(approvalId)?.(yes);
+  if (a) decided(approvalId, { confirmed: yes, always, by: opts.by });
+  const waiting = live.waiting.get(approvalId);
+  waiting?.(yes);
   live.waiting.delete(approvalId);
+  return !!a || !!waiting;
+}
+
+/** Whether the user always allows this bot this action (in this account). */
+export const alwaysAllowed = (botId: string, action: string, account?: string) =>
+  !!getState().appAlways?.some((r) => r.botId === botId && r.action === action && (!r.account || !account || r.account === account));
+
+/** Stop always allowing it: the next time, the bot asks again. */
+export function removeAlways(ruleId: string) {
+  update((s) => void (s.appAlways = (s.appAlways ?? []).filter((r) => r.id !== ruleId)));
 }
 
 /* ---------------- Apps inside threads ---------------- */

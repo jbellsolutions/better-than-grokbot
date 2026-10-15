@@ -10,14 +10,14 @@ async function main() {
   if (process.platform !== 'darwin') throw Error('Encrypted recovery images require macOS.');
   if (execFileSync('git', ['status','--porcelain'], { cwd: root }).length) throw Error('Commit project changes before taking an exact checkpoint.');
   const { state } = await (await fetch('http://127.0.0.1:3210/api/state', { signal: AbortSignal.timeout(5000) })).json();
-  if (state.sessions.some(s => ['starting','running','queued'].includes(s.status)) || state.chats.some(c => c.typing?.length)) throw Error('Wait until work finishes before taking a checkpoint.');
+  if (state.sessions.some(s => ['starting','running','queued'].includes(s.status) || !!s.hermesHelpId) || state.chats.some(c => c.typing?.length)) throw Error('Wait until work finishes before taking a checkpoint.');
   for (const instance of readRegistry(root).filter(e => e.id !== 'default')) {
     const file = path.join(root, '.data/instances', instance.id, 'state.json');
     if (!fs.existsSync(file)) continue;
     const response = await fetch(`${instance.url}/api/state`, { signal: AbortSignal.timeout(5000) });
     if (!response.ok) throw Error(`Could not checkpoint ${instance.name}.`);
     const saved = await response.json();
-    if (saved.instance?.id !== instance.id || saved.state.sessions.some(s => ['starting','running','queued'].includes(s.status)) || saved.state.chats.some(c => c.typing?.length)) throw Error(`Wait until ${instance.name} is available and idle before taking a checkpoint.`);
+    if (saved.instance?.id !== instance.id || saved.state.sessions.some(s => ['starting','running','queued'].includes(s.status) || !!s.hermesHelpId) || saved.state.chats.some(c => c.typing?.length)) throw Error(`Wait until ${instance.name} is available and idle before taking a checkpoint.`);
   }
   const sha = execFileSync('git',['rev-parse','--short','HEAD'],{cwd:root}).toString().trim();
   const name = `checkpoint-${new Date().toISOString().replace(/[:.]/g,'-')}-${sha}`;
@@ -38,7 +38,7 @@ async function main() {
     for (const name of ['state.json','openrouter','models.json']) { const from=path.join(root,'.data',name); if(fs.existsSync(from)) fs.cpSync(from,path.join(staging,'state',name),{recursive:true}); }
     for (const name of ['instances.json','instances']) { const from = path.join(root,'.data',name); if(fs.existsSync(from))fs.cpSync(from,path.join(staging,'state',name),{recursive:true}); }
     const deployment = path.join(staging,'deployment');fs.mkdirSync(deployment,{mode:0o700});
-    for (const name of ['ai.orgo.bops.selfhosted.server.plist','ai.orgo.bops.selfhosted.updates.plist','ai.orgo.bops.selfhosted.ai-guy.plist','ai.orgo.bops.selfhosted.revenue-partners.plist']) { const from=path.join(os.homedir(),'Library/LaunchAgents',name); if(fs.existsSync(from))fs.copyFileSync(from,path.join(deployment,name)); }
+    for (const name of ['server','updates','edge','edge-tunnel',...readRegistry(root).filter(e=>e.id!=='default').map(e=>e.id)].map(id=>`ai.orgo.bops.selfhosted.${id}.plist`)) { const from=path.join(os.homedir(),'Library/LaunchAgents',name); if(fs.existsSync(from))fs.copyFileSync(from,path.join(deployment,name)); }
     fs.copyFileSync(path.join(root,'.data/service.json'),path.join(deployment,'service.json'));
     const zip=path.join(root,'dist-desktop/share/Better-Than-GrokBot-arm64.zip'); if(fs.existsSync(zip))fs.copyFileSync(zip,path.join(staging,'Better-Than-GrokBot-arm64.zip'));
     fs.copyFileSync(path.join(root,'README.md'),path.join(staging,'RESTORE.md'));

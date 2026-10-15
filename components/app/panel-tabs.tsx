@@ -1,7 +1,8 @@
 "use client";
 
 import { createContext, createElement, useEffect, useRef, useState } from "react";
-import { live, type AppState } from "@/lib/types";
+import { type AppState } from "@/lib/types";
+import { workStatus } from "@/lib/work-status";
 import type { Section } from "./bot-panel";
 import { Mascot } from "./mascot";
 import { MacIcon } from "./mac-tab";
@@ -79,20 +80,20 @@ export function TabBar({
 function Tab({ state, tab: t, on, closable, onPick, onClose }: { state: AppState; tab: PanelTab; on: boolean; closable: boolean; onPick: () => void; onClose: () => void }) {
   const b = "botId" in t ? state.bots.find((x) => x.id === t.botId) : undefined;
   // A computer tab says when its bot is working, or when something there needs you.
-  const working =
-    (t.kind === "computer" && state.sessions.some((s) => s.botId === t.botId && live(s) && s.runsOn !== "mac")) ||
-    (t.kind === "mac" && state.sessions.some((s) => s.runsOn === "mac" && live(s)));
+  const tasks = state.sessions.filter(s => t.kind === "computer" ? s.botId === t.botId && s.runsOn !== "mac" : t.kind === "mac" && s.runsOn === "mac").map(workStatus);
+  const working = tasks.some(s => s.kind === "running" || s.kind === "starting");
+  const queued = tasks.some(s => s.kind === "queued");
   const needsYou =
     (t.kind === "computer" &&
-      (state.watches?.some((w) => w.botId === t.botId && w.alert) || state.sessions.some((s) => s.botId === t.botId && live(s) && s.blocker))) ||
-    (t.kind === "mac" && !!state.mac?.approvals.length);
+      (state.watches?.some((w) => w.botId === t.botId && w.alert) || tasks.some(s => s.attention))) ||
+    (t.kind === "mac" && (!!state.mac?.approvals.length || tasks.some(s => s.attention)));
   const label =
     t.kind === "computer" ? `${b?.name ?? "Bot"}'s computer` : t.kind === "bot" ? (b?.name ?? "Bot") : t.kind === "web" ? t.title || hostOf(t.url) : t.kind === "business" ? "Business desk" : t.kind === "vault" ? "Vault" : t.kind === "mac" ? "Your Mac" : "New tab";
   return (
     <div
       onClick={onPick}
       onAuxClick={(e) => e.button === 1 && closable && onClose()}
-      title={t.kind === "web" ? t.url : label}
+      title={t.kind === "web" ? t.url : [label, ...tasks.filter(s => s.attention || ["queued", "starting", "running"].includes(s.kind)).map(s => s.text)].join(" · ")}
       className={`group/tab flex h-[30px] min-w-0 max-w-[220px] shrink cursor-default items-center gap-1.5 rounded-[10px] pl-2.5 ${closable ? "pr-1" : "pr-3"} text-[13px] leading-4 [-webkit-app-region:no-drag] ${
         on ? "bg-white text-ink shadow-[0_0_0_1px_#0000000F,0_2px_6px_-3px_#00000026]" : "text-[#6B6B6B] hover:bg-[#EEEEEC]"
       }`}
@@ -112,8 +113,8 @@ function Tab({ state, tab: t, on, closable, onPick, onClose }: { state: AppState
       {needsYou ? (
         <span className="size-[7px] shrink-0 rounded-full bg-highlighter shadow-[0_0_0_1.5px_#0A0A0A]" title="Needs you" />
       ) : working ? (
-        <span className="size-[6px] shrink-0 animate-pulse rounded-full bg-[#2BB673]" title="Working" />
-      ) : null}
+        <span className="size-[6px] shrink-0 animate-pulse rounded-full bg-[#2BB673]" title={tasks.some(s => s.kind === "running") ? "Working" : "Starting"} />
+      ) : queued ? <span className="size-[6px] shrink-0 rounded-full bg-[#9A9A98]" title="Queued" /> : null}
       {closable && (
         <button
           onClick={(e) => {

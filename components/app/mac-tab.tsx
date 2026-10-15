@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { live, type AppState, type MacApproval } from "@/lib/types";
 import { MacStream, useAppWindowSource } from "./mac-screens";
 import { Mascot } from "./mascot";
-import { post } from "./ui";
+import { post, StatusIcon } from "./ui";
+import { workStatus } from "@/lib/work-status";
 
 /*
  * The user's Mac, as a place bots work: whether it's ready, what's waiting on their OK, what's running
@@ -23,11 +24,28 @@ export function MacIcon({ size = 14, color = "currentColor" }: { size?: number; 
 /** One of Codex's questions, as a card: "Sam wants to use Calculator on your Mac". */
 export function ApprovalCard({ state, approval: a, compact }: { state: AppState; approval: MacApproval; compact?: boolean }) {
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [loadedPreview, setLoadedPreview] = useState<{ id: string; text: string } | null>(null);
+  const preview = loadedPreview?.id === a.id ? loadedPreview.text : null;
+  useEffect(() => {
+    if (a.kind !== "command") return;
+    let active = true;
+    void fetch(`/api/mac/preview?id=${encodeURIComponent(a.id)}`, { signal: AbortSignal.timeout(7000), cache: "no-store" }).then(async r => {
+      const data = await r.json();
+      if (!r.ok) throw Error(data.error || "Could not inspect this action.");
+      if (active) setLoadedPreview({ id: a.id, text: data.preview?.command || data.preview?.grantRoot || data.preview?.changes ? JSON.stringify(data.preview, null, 2) : "" });
+    }).catch(() => { if (active) setLoadedPreview({ id: a.id, text: "" }); });
+    return () => { active = false; };
+  }, [a.id, a.kind]);
   const b = state.bots.find((x) => x.id === a.botId);
   const s = state.sessions.find((x) => x.id === a.sessionId);
   const decide = async (decision: "once" | "session" | "always" | "deny") => {
-    setBusy(true);
-    await post("/api/mac", { id: a.id, decision });
+    setBusy(true); setError("");
+    try {
+      const res = await post("/api/mac", { id: a.id, decision });
+      if (!res.ok) throw Error((await res.json()).error || "Could not answer this request.");
+    } catch (e) { setError((e as Error).message); }
+    finally { setBusy(false); }
   };
   const who = b?.name ?? "A bot";
   const btn = "rounded-full px-3 py-1.5 text-[12.5px] font-medium leading-4 disabled:opacity-50";
@@ -41,15 +59,19 @@ export function ApprovalCard({ state, approval: a, compact }: { state: AppState;
               <>
                 {who} wants to use <span className="rounded-[5px] bg-[#F2F2F0] px-1">{a.app}</span> on your Mac
               </>
-            ) : a.kind === "command" ? (
+            ) : a.kind === "command" || a.kind === "permissions" ? (
               `${who} wants to ${a.message.charAt(0).toLowerCase()}${a.message.slice(1)}`
             ) : (
               `${who} is asking on your Mac: ${a.message}`
             )}
           </span>
           {s && <span className="truncate text-[12px] leading-4 text-[#6B6B6B]">For &ldquo;{s.title}&rdquo;</span>}
+          <span className="text-[12px] leading-4 text-[#6B6B6B]">Computer: {state.instance?.name ?? "Current Bops"}</span>
         </div>
       </div>
+      {a.requestedPermissions && <pre className="max-h-32 overflow-auto whitespace-pre-wrap text-xs">{JSON.stringify(a.requestedPermissions, null, 2)}</pre>}
+      {a.kind === "command" && <details className="text-xs"><summary className="cursor-pointer">{preview === null ? "Loading action preview…" : preview ? "Inspect requested action" : "Action preview unavailable; deny and retry this task"}</summary><pre className="mt-2 max-h-60 overflow-auto whitespace-pre-wrap break-words">{preview}</pre></details>}
+      {error && <p role="alert" className="text-xs text-[#B42318]">{error}</p>}
       <div className="flex flex-wrap gap-1.5">
         {a.kind === "app" ? (
           <>
@@ -66,10 +88,10 @@ export function ApprovalCard({ state, approval: a, compact }: { state: AppState;
           </>
         ) : (
           <>
-            <button disabled={busy} onClick={() => void decide("once")} className={`${btn} bg-ink text-white`}>
+            <button disabled={busy || a.kind === "command" && !preview} onClick={() => void decide("once")} className={`${btn} bg-ink text-white`}>
               Allow
             </button>
-            <button disabled={busy} onClick={() => void decide("session")} className={`${btn} bg-[#F2F2F0] hover:bg-[#EAEAE7]`}>
+            <button disabled={busy || a.kind === "command" && !preview} onClick={() => void decide("session")} className={`${btn} bg-[#F2F2F0] hover:bg-[#EAEAE7]`}>
               For this task
             </button>
           </>
@@ -86,6 +108,16 @@ export function ApprovalCard({ state, approval: a, compact }: { state: AppState;
 export function MacSettings({ state }: { state: AppState }) {
   const m = state.mac;
   const [rule, setRule] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const changeAccess = async (enabled: boolean) => {
+    setBusy(true); setError("");
+    try {
+      const res = await post("/api/mac", { enabled }, "PATCH");
+      if (!res.ok) throw Error((await res.json()).error || "Could not change Mac access.");
+    } catch (e) { setError((e as Error).message); }
+    finally { setBusy(false); }
+  };
   const section = "flex flex-col gap-2";
   const heading = "text-[15px] font-semibold leading-5";
   const sub = "text-[12.5px] leading-[17px] text-[#6B6B6B]";
@@ -103,12 +135,18 @@ export function MacSettings({ state }: { state: AppState }) {
               <span className={`size-2 rounded-full ${m?.ready ? "bg-[#2BB673]" : "bg-[#C9C9C6]"}`} />
               {m?.ready
                 ? `Bots can work here using your ChatGPT plan${m.plan ? ` (${m.plan.replace(/_/g, " ")})` : ""}. You approve each app the first time.`
-                : (m?.reason ?? "Checking…")}
+                : (m?.reason ?? "Mac connection has not been checked. Use Check again." )}
             </span>
           </div>
           <button onClick={() => void post("/api/mac", { check: true }, "PATCH")} className="shrink-0 rounded-full px-3 py-1.5 text-[12.5px] font-medium shadow-[0_0_0_1px_#E2E2DF] hover:bg-[#F7F7F6]">
             Check again
           </button>
+        </div>
+        <div className={section}>
+          <span className={heading}>{state.instance?.name ?? "This computer"} · Mac access</span>
+          <span className={sub}>Allow this computer to request work and build apps on your Mac. App, command and file approvals remain yours; macOS permissions are checked when the helper opens an app.</span>
+          <button disabled={busy} onClick={() => void changeAccess(m?.accessEnabled !== true)} className="self-start rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? "Updating…" : m?.accessEnabled === true ? "Turn off Mac access" : "Allow this computer"}</button>
+          {error && <p role="alert" className="text-xs text-[#B42318]">{error}</p>}
         </div>
 
         <div className={section}>
@@ -214,7 +252,8 @@ export function MacTiles({ tiles, onOpen, max = 480, tall = false }: { tiles: Re
             <span className="min-w-0 flex-1 truncate text-[12px] leading-4">
               <span className="font-semibold">{b?.name ?? "A bot"}</span> · {app}
             </span>
-            {live(s) ? <span className="size-1.5 animate-pulse rounded-full bg-[#2BB673]" title="Working" /> : <span className="text-[11px] text-[#9A9A98]">done</span>}
+            <StatusIcon session={s} size={11} />
+            <span className="truncate text-[11px] text-[#9A9A98]" title={workStatus(s).text}>{workStatus(s).label}</span>
           </div>
           <button onClick={onOpen} title={`${s.title}: open Your Mac`} className={`block w-full ${tall ? "min-h-0 flex-1" : ""}`}>
             <MacWindow app={app} max={max} className={tall ? "h-full w-full" : "h-[150px] w-full"} />

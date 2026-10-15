@@ -1,12 +1,14 @@
 import "server-only";
-import { randomInt, timingSafeEqual } from "node:crypto";
+import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import type { SlackLinkIn, SlackLinksBody, SlackLinksResult } from "@/cloud/protocol";
 import { pictureName } from "@/lib/mascot";
 import { botChatId, pairCodeLive, PAIR_CODE_MS, type Bot, type ChannelKind, type ChannelLink, type ChannelPlace, type Message } from "@/lib/types";
 import { cloudJson, cloudOn, cloudSession, cloudSessionNow } from "./cloud";
 import { deleteSecret, getSecret, setSecret } from "./keychain";
-import { composio, composioUser, publicUrl, runAs } from "./composio";
+import { composio, composioUser, publicUrl } from "./composio";
+import { instanceId, instanceName } from "./instance";
+import { ensureSlackAppAccount, isOwnSlack, SLACK_API, slackApp, slackAppKnown, slackCall, SlackError, slackFrontDoor, slackMe } from "./slack-api";
 import { addMessage, bot, getState, id, ownerName, patchSession, update, watchChanges } from "./store";
 import { saveUpload } from "./uploads";
 
@@ -19,8 +21,10 @@ import { saveUpload } from "./uploads";
  *   Discord's developer portal) and pastes the token of. So it shows up as "Boppy", with its own name.
  *   Its token lives in the Keychain. Bops talks to them directly: Telegram by long polling, Discord over
  *   its gateway. Neither needs Bops to be reachable from the internet.
- * - Slack: Bops' own Slack app (slack/manifest.json), connected as a Composio account (the "slackbot"
- *   app, in the Vault), and the channels each bot is in. Its events come to Bops Cloud, which passes
+ * - Slack: Bops' own Slack app (slack/manifest.json): the user's own app with its token pasted in Bops
+ *   (slack-api.ts; buttons, thread status and live answers need it), or connected as a Composio
+ *   account (the "slackbot" app, in the Vault), and the channels each bot is in. A bot's turn there
+ *   is drawn live by slack-render.ts. Its events come to Bops Cloud, which passes
  *   this Mac the ones for its bots over the tunnel, or keeps them a day while it's away; this Mac
  *   tells the cloud where its bots are (PUT /v1/slack/links: syncSlackLinks, below). Self-hosted, the
  *   self-hoster's own Slack app sends them to their front door (edge/, BOPS_SLACK_SIGNING_SECRET), or
@@ -41,8 +45,16 @@ type Live = {
   slackLinks?: { sent?: string; chain: Promise<unknown>; failures: number; retryAt?: number; timer?: ReturnType<typeof setTimeout>; soon?: ReturnType<typeof setTimeout> };
   /** Who's been told the bot only takes requests from its owner, so they're told once. */
   toldOff: Set<string>;
-  /** Slack threads a bot answered in: a reply there is to the bot, without mentioning it again. */
+  /** Slack threads a bot started answering at their first message: a reply there is to the bot, without mentioning it again. */
   slackThreads: Set<string>;
+  /**
+   * Slack threads ("channel:ts") another app's bot is part of (it posted there, or was mentioned):
+   * that bot may answer every reply there too, so ours needs to be mentioned, and stays out of the
+   * thread altogether when it would make two answers.
+   */
+  slackShared?: Set<string>;
+  /** When each Slack person last wrote to the bots here directly (the front door sends their next direct message here). */
+  slackTalked?: Map<string, number>;
   seen: Set<string>;
 };
 const g = globalThis as unknown as { bopsChannels?: Live };
@@ -104,15 +116,20 @@ export function startChannels() {
   // Signed in with Orgo, Slack's events come through Bops Cloud (which never passes Composio's live
   // trigger feed on): it hears where the bots are instead.
   if (cloudOn()) void syncSlackLinks().catch(() => {});
-  else if (linksOf("slack").length && !ownSlackApp()) void listenSlack();
+  else
+    void slackApp().then(() => {
+      if (linksOf("slack").some((l) => !isOwnSlack(l.slack?.accountId)) && !ownSlackApp()) void listenSlack();
+      void ensureSlackAppAccount().catch((e: Error) => console.warn(`[slack] ${e.message}`));
+    });
+  void import("./slack-render").then((r) => r.startSlackRenderer());
 }
 
 /**
  * Bops' own Slack app is set up, so its events come straight to Bops: signed in with Orgo, Bops
  * Cloud takes them for it (CloudSession.slack: at Orgo, the "Bops" app); self-hosted, the
- * self-hoster's own app (slack/setup.mjs), signed with BOPS_SLACK_SIGNING_SECRET.
+ * self-hoster's own app (slack/setup.mjs), signed with its signing secret (slack-api.ts).
  */
-export const ownSlackApp = () => (cloudOn() ? !!cloudSessionNow()?.slack : !!process.env.BOPS_SLACK_SIGNING_SECRET);
+export const ownSlackApp = () => (cloudOn() ? !!cloudSessionNow()?.slack : slackAppKnown());
 
 /* ---------------- A message in ---------------- */
 
@@ -128,7 +145,8 @@ type Incoming = {
   direct: boolean;
   /** Mentioned, or replied to, in a group or channel. */
   mentioned: boolean;
-  imageUrls?: { url: string; type?: string; headers?: Record<string, string> }[];
+  /** `strict`: only a real picture counts (Slack answers a file it won't give with a login page). */
+  imageUrls?: { url: string; type?: string; headers?: Record<string, string>; strict?: boolean }[];
 };
 
 /** A message that's a code and nothing else (digits, spaces allowed: "123 456"), as the code. */
@@ -202,7 +220,12 @@ async function messageIn(linkId: string, m: Incoming, pool?: ChannelLink[]) {
   for (const t of getState().sessions.filter((x) => x.chatId === chatId && x.createdAt >= mine.at && !x.channelBack && !x.textBack)) patchSession(t.id, { channelBack: place });
   const replies = getState().messages.filter((x) => x.chatId === chatId && x.role === "bot" && x.botId === b.id && x.at >= mine.at);
   const failed = (err: Error) => addMessage({ chatId, role: "system", text: `Couldn't send this back to ${KIND_NAME[l.kind]}: ${err.message}` });
-  for (const r of replies) await send(l, place, r.text).catch(failed);
+  // In Slack a turn's answer was drawn there as it was written (slack-render.ts): only the rest goes now.
+  const drawn = l.kind === "slack" ? (await import("./slack-render")).slackDrawn : () => undefined;
+  for (const r of replies) {
+    const drawing = drawn(r.id);
+    if (!drawing || !(await drawing)) await send(l, place, r.text).catch(failed);
+  }
   if (!replies.length) {
     const tapback = getState().messages.find((x) => x.id === mine.id)?.reactions?.find((x) => x.by === b.id);
     await (tapback ? react(l, place, tapback.emoji ?? TAPBACK_EMOJI[tapback.type ?? "like"] ?? "👍") : send(l, place, "Got it.")).catch(failed);
@@ -241,12 +264,25 @@ const TAPBACK_EMOJI: Record<string, string> = { love: "❤️", like: "👍", di
 /**
  * A bot's picture (its mascot, as drawn in Bops), from the set rendered ahead of time (pictureName in
  * lib/mascot.ts), at Bops' public address: Bops Cloud's, or a self-hoster's front door (edge/). A
- * color without a picture gets the Bops logo.
+ * color without a picture gets the Bops logo. None without a public address (BOPS_PUBLIC_URL).
  */
-export const mascotUrl = (b: Bot) => {
+export const mascotUrl = (b: Bot, base = publicUrl()) => {
+  if (!base) return undefined;
   const name = pictureName(b);
-  return name ? `${publicUrl()}/mascot/${name}.png` : `${publicUrl()}/brand/bops-512.png`;
+  return name ? `${base}/mascot/${name}.png` : `${base}/brand/bops-512.png`;
 };
+
+/**
+ * How a bot is named and pictured in Slack. Through our own app, which every Bops on this Mac shares
+ * (and next to other agents' own Slack apps, one of them maybe a "Head of Sales" too), the name
+ * says it's Bops: "Head of Sales · Bops", or for a team's other bots the team's name, so the
+ * same helper on two teams reads apart ("Bapi · Sales Team"). Its picture comes from this Mac's front door.
+ */
+export function slackIdentityOf(b: Bot, accountId?: string) {
+  if (!isOwnSlack(accountId)) return { username: b.name, icon_url: mascotUrl(b) };
+  const team = b.isMain || instanceId() === "default" ? "Bops" : instanceName();
+  return { username: `${b.name} · ${team}`.slice(0, 80), icon_url: mascotUrl(b, slackFrontDoor() ?? publicUrl()) };
+}
 
 /**
  * One of those pictures as a file ("mascot/blob-2EC4B6.jpg"), for Telegram's and Discord's profile
@@ -257,6 +293,7 @@ async function pictureFile(path: string): Promise<Buffer | null> {
   try {
     const local = `${process.cwd()}/edge/public/${path}`;
     if (existsSync(local)) return readFileSync(local);
+    if (!publicUrl()) return null;
     const res = await fetch(`${publicUrl()}/${path}`, { signal: AbortSignal.timeout(15_000) });
     if (!res.ok || !/^image\//.test(res.headers.get("content-type") ?? "")) return null;
     return Buffer.from(await res.arrayBuffer());
@@ -307,29 +344,40 @@ export async function renameInChannels(botId: string) {
 const plainSlack = new Set<string>();
 
 /**
- * A Slack message from the bot, as itself: its name and mascot on the message, through our own
- * Slack app (it has chat:write.customize). Composio's shared app can't, so there the bot's name
- * leads the message when more than one bot shares the app.
+ * A Slack message from the bot, as itself: its name and mascot on the message (chat:write.customize,
+ * which our own Slack app has). An app without it posts as itself, the bot's name leading the message
+ * when more than one bot shares the app. Returns the message's ts. `body`: chat.postMessage's
+ * arguments (channel, markdown_text or text and blocks, thread_ts).
  */
-async function slackPost(l: ChannelLink, channel: string, text: string, thread?: string) {
+export async function slackPostAs(l: ChannelLink, body: Record<string, unknown>) {
   const b = bot(l.botId);
   const accountId = l.slack!.accountId;
   if (b && !plainSlack.has(accountId)) {
-    const r = (await composio()
-      .tools.proxyExecute({
-        endpoint: "/chat.postMessage",
-        method: "POST",
-        connectedAccountId: accountId,
-        body: { channel, markdown_text: text, username: b.name, icon_url: mascotUrl(b), ...(thread ? { thread_ts: thread } : {}) },
-      })
-      .catch((e: Error) => ({ data: { ok: false, error: e.message } }))) as unknown as { data?: { ok?: boolean; error?: string } };
-    if (r.data?.ok) return;
-    if (!/missing_scope|not_allowed_token_type|invalid_arguments/.test(r.data?.error ?? "")) throw new Error(`Slack: ${r.data?.error ?? "couldn't post"}`);
-    plainSlack.add(accountId);
+    try {
+      return (await slackCall<{ ts: string }>(accountId, "chat.postMessage", { ...body, ...slackIdentityOf(b, accountId) })).ts;
+    } catch (e) {
+      if (!(e instanceof SlackError) || !/missing_scope|not_allowed_token_type|invalid_arguments/.test(e.code)) throw e;
+      plainSlack.add(accountId);
+    }
   }
   const shared = linksOf("slack").filter((x) => x.slack?.accountId === accountId).length > 1;
-  await runAs(accountId, "SLACKBOT_SEND_MESSAGE", { channel, markdown_text: shared && b ? `*${b.name}:* ${text}` : text, ...(thread ? { thread_ts: thread } : {}) });
+  const named = shared && b ? { ...body, ...(typeof body.markdown_text === "string" ? { markdown_text: `*${b.name}:* ${body.markdown_text}` } : {}), ...(typeof body.text === "string" ? { text: `${b.name}: ${body.text}` } : {}) } : body;
+  return (await slackCall<{ ts: string }>(accountId, "chat.postMessage", named)).ts;
 }
+
+/**
+ * The thread a bot answers in there: the message's own (a channel always; a DM with our own app too,
+ * which has thread status and live answers). A thread it starts answering at its first message is its
+ * own from then on (a reply there needs no mention); one it was only mentioned in partway isn't.
+ */
+export function slackThreadOf(l: ChannelLink, p: ChannelPlace) {
+  const thread = p.thread ?? (p.chat.startsWith("D") && !isOwnSlack(l.slack?.accountId) ? undefined : p.messageId);
+  if (thread && (!isOwnSlack(l.slack?.accountId) || !p.thread || p.thread === p.messageId)) live.slackThreads.add(`${p.chat}:${thread}`);
+  return thread;
+}
+
+/** A link, by id (slack-render.ts). */
+export const channelLink = (linkId: string) => linkOf(linkId);
 
 /**
  * A thread started from a channel finished (or failed): its result goes back there, naming the bot
@@ -350,7 +398,9 @@ async function picsOf(urls: NonNullable<Incoming["imageUrls"]>) {
   for (const u of urls.slice(0, 4)) {
     try {
       const res = await fetch(u.url, { headers: u.headers });
+      if (!res.ok) continue;
       let type = (res.headers.get("content-type") ?? "").split(";")[0].toLowerCase();
+      if (u.strict && !/^image\//.test(type)) continue;
       if (!/^image\//.test(type)) type = u.type ?? (/\.png$/i.test(u.url) ? "image/png" : /\.webp$/i.test(u.url) ? "image/webp" : "image/jpeg");
       if (!/^image\/(png|jpeg|webp|gif)$/.test(type)) continue;
       out.push(saveUpload(`data:${type};base64,${Buffer.from(await res.arrayBuffer()).toString("base64")}`));
@@ -384,9 +434,8 @@ async function send(l: ChannelLink, p: ChannelPlace, text: string) {
     for (const [i, part] of chunks(text, 1900).entries())
       await dc(token, "POST", `/channels/${p.chat}/messages`, { content: part, allowed_mentions: { parse: [] }, ...(i === 0 && p.messageId && p.thread !== "dm" ? { message_reference: { message_id: p.messageId, fail_if_not_exists: false } } : {}) });
   } else {
-    const thread = p.thread ?? (p.chat.startsWith("D") ? undefined : p.messageId);
-    if (thread) live.slackThreads.add(`${p.chat}:${thread}`);
-    for (const part of chunks(text, 3500)) await slackPost(l, p.chat, part, thread);
+    const thread = slackThreadOf(l, p);
+    for (const part of chunks(text, 3500)) await slackPostAs(l, { channel: p.chat, markdown_text: part, ...(thread ? { thread_ts: thread } : {}) });
   }
 }
 
@@ -401,7 +450,7 @@ async function react(l: ChannelLink, p: ChannelPlace, emoji: string) {
     await dc(await tokenOf(l), "PUT", `/channels/${p.chat}/messages/${p.messageId}/reactions/${encodeURIComponent(emoji)}/@me`);
   } else {
     const name: Record<string, string> = { "❤️": "heart", "👍": "+1", "👎": "-1", "😂": "joy", "‼️": "bangbang", "❓": "question" };
-    await runAs(l.slack!.accountId, "SLACKBOT_ADD_REACTION_TO_AN_ITEM", { channel: p.chat, timestamp: p.messageId, name: name[emoji] ?? "+1" });
+    await slackCall(l.slack!.accountId, "reactions.add", { channel: p.chat, timestamp: p.messageId, name: name[emoji] ?? "+1" });
   }
 }
 
@@ -671,17 +720,19 @@ async function discordIn(linkId: string, token: string, m: DcMessage) {
   void token;
 }
 
-/* ---------------- Slack (through Composio) ---------------- */
+/* ---------------- Slack ---------------- */
 
 /** Slack channels the Slack app can see, for picking where a bot goes. */
 export async function slackChannels(accountId: string) {
   const out: { id: string; name: string; private: boolean; member: boolean }[] = [];
   let cursor: string | undefined;
   for (let i = 0; i < 5; i++) {
-    const r = (await runAs(accountId, "SLACKBOT_LIST_ALL_CHANNELS", { limit: 200, exclude_archived: true, types: "public_channel,private_channel", ...(cursor ? { cursor } : {}) })) as {
-      channels?: { id: string; name: string; is_private?: boolean; is_member?: boolean }[];
-      response_metadata?: { next_cursor?: string };
-    };
+    const r = await slackCall<{ channels?: { id: string; name: string; is_private?: boolean; is_member?: boolean }[]; response_metadata?: { next_cursor?: string } }>(accountId, "conversations.list", {
+      limit: 200,
+      exclude_archived: true,
+      types: "public_channel,private_channel",
+      ...(cursor ? { cursor } : {}),
+    });
     for (const c of r.channels ?? []) out.push({ id: c.id, name: c.name, private: !!c.is_private, member: !!c.is_member });
     cursor = r.response_metadata?.next_cursor || undefined;
     if (!cursor) break;
@@ -690,17 +741,14 @@ export async function slackChannels(accountId: string) {
 }
 
 /**
- * Who the Slack app is there (its workspace, its bot user), from Slack's auth.test through Composio.
- * Without the workspace no message could be matched to the bot, so no answer is a failure.
+ * Who the Slack app is there (its workspace, its bot user), from Slack's auth.test. Without the
+ * workspace no message could be matched to the bot, so no answer is a failure.
  */
 async function slackIdentity(accountId: string) {
-  const r = (await composio()
-    .tools.proxyExecute({ endpoint: "/auth.test", method: "POST", connectedAccountId: accountId })
-    .catch((e: Error) => {
-      throw new Error(`Couldn't ask Slack which workspace this is: ${e.message}`);
-    })) as unknown as { data?: { ok?: boolean; error?: string; user_id?: string; team?: string; team_id?: string; bot_id?: string } };
-  const d = r.data ?? {};
-  if (d.ok !== true || !d.team_id) throw new Error(`Slack wouldn't say which workspace this is${d.error ? ` (${d.error})` : ""}. Add Better Than GrokBot to Slack again.`);
+  const d = await slackCall<{ user_id?: string; team?: string; team_id?: string; bot_id?: string }>(accountId, "auth.test").catch((e: Error) => {
+    throw new Error(`Slack wouldn't say which workspace this is (${e instanceof SlackError ? e.code : e.message}). Add Better Than GrokBot to Slack again.`);
+  });
+  if (!d.team_id) throw new Error("Slack wouldn't say which workspace this is. Add Better Than GrokBot to Slack again.");
   // Only a bot token's answer names the bot (it has bot_id); a person's token would name the person,
   // and then mentioning them would count as mentioning the bot.
   return { team: d.team, team_id: d.team_id, user_id: d.bot_id ? d.user_id : undefined };
@@ -717,11 +765,12 @@ export async function linkSlack(botId: string, accountId: string, channels: { id
   // Which workspace it is comes first: without it the bot could never be found there, so a failure saves nothing.
   const who = existing?.slack?.teamId ? null : await slackIdentity(accountId);
   // The app can join public channels itself; a private one needs /invite from someone in it.
-  for (const c of channels) await runAs(accountId, "SLACKBOT_JOIN_AN_EXISTING_CONVERSATION", { channel: c.id }).catch(() => null);
+  for (const c of channels) await slackCall(accountId, "conversations.join", { channel: c.id }).catch(() => null);
   // With our own Slack app, Slack sends its events to Bops Cloud or the self-hoster's front door
   // (BOPS_SLACK_SIGNING_SECRET checks them). With Composio's shared app, Composio watches the messages:
   // set that up first, so a failure saves nothing.
-  if (!ownSlackApp()) {
+  await slackApp();
+  if (!isOwnSlack(accountId) && !ownSlackApp()) {
     await ensureSlackTriggers(accountId);
     void listenSlack();
   }
@@ -768,7 +817,7 @@ async function listenSlack() {
 type SlackEvent = {
   triggerSlug: string;
   metadata?: { connectedAccount?: { id?: string } };
-  payload?: { channel?: string; channel_type?: string; user?: string; text?: string; ts?: string; thread_ts?: string; bot_id?: string; subtype?: string; files?: { mimetype?: string; url_private?: string }[] };
+  payload?: { channel?: string; channel_type?: string; user?: string; text?: string; ts?: string; thread_ts?: string; bot_id?: string; subtype?: string; files?: { mimetype?: string; url_private?: string; url_private_download?: string }[] };
 };
 
 async function slackIn(e: SlackEvent) {
@@ -813,13 +862,27 @@ type SlackPayload = NonNullable<SlackEvent["payload"]>;
  * A Slack message for one of the bots. `ownApp`: it came from our own Slack app's events, which only
  * carry the app's own conversations; Composio's direct-message event also sees the user's other DMs,
  * so then only the user's one-to-one with the app counts (learned from the pairing message).
+ *
+ * Our own app shares its channels with other agents' own Slack apps (Hermes', each its own bot), so a
+ * message there is never answered twice: in a channel a bot answers only when the app is @mentioned
+ * (naming a bot only picks which one), or in a thread it started; and it stays out of a thread another
+ * app's bot is part of, as that bot answers every reply there too (telling the person why, privately).
  */
 async function slackMessage(links: ChannelLink[], p: SlackPayload, ownApp: boolean) {
-  if (!links.length || !p.channel || !p.ts || !p.user || p.bot_id || (p.subtype && p.subtype !== "file_share" && p.subtype !== "thread_broadcast")) return;
+  if (!links.length || !p.channel || !p.ts) return;
+  const direct = p.channel_type === "im" || p.channel.startsWith("D");
   const accountId = links[0].slack!.accountId;
+  const thread = p.thread_ts && p.thread_ts !== p.ts ? p.thread_ts : undefined;
+  const threadKey = `${p.channel}:${thread ?? p.ts}`;
+  if (p.bot_id) {
+    // Another app's bot posting in a thread makes it part of that thread (our own posts don't count).
+    if (ownApp && !direct && p.bot_id !== (await slackMe())?.bot_id) sharedThreads().add(threadKey);
+    return;
+  }
+  if (!p.user || (p.subtype && p.subtype !== "file_share" && p.subtype !== "thread_broadcast")) return;
   const text = p.text ?? "";
   const words = text.replace(/<@[A-Z0-9]+>/g, "").trim();
-  const direct = p.channel_type === "im" || p.channel.startsWith("D");
+  if (ownApp && direct) talked().set(p.user, Date.now());
   // Which bot: the one whose pairing code it is, else the one named, else (DMs) one paired with them or
   // the main one, else the channel's. Its direct message is recorded only once it's proven to be the
   // user's (messageIn: from the person paired, or with the right code), never a stranger's.
@@ -845,8 +908,29 @@ async function slackMessage(links: ChannelLink[], p: SlackPayload, ownApp: boole
   const l = pick;
   const b = bot(l.botId)!;
   const atApp = !!l.slack?.botUserId && text.includes(`<@${l.slack.botUserId}>`);
-  const inThread = !!p.thread_ts && live.slackThreads.has(`${p.channel}:${p.thread_ts}`);
-  const named = new RegExp(`\\b${b.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(text);
+  let mentioned: boolean;
+  if (!ownApp || direct) {
+    const inThread = !!p.thread_ts && live.slackThreads.has(`${p.channel}:${p.thread_ts}`);
+    const named = new RegExp(`\\b${b.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(text);
+    mentioned = atApp || inThread || named;
+  } else {
+    const ours = !!thread && live.slackThreads.has(threadKey);
+    // Neither to the app nor in a thread of ours: not for us, and nothing to look up.
+    if (!atApp && !ours) return;
+    // Other bots this message mentions: then it's addressed to them too, and they may answer every reply after it.
+    const others = await otherBotsIn(accountId, text, l.slack?.botUserId);
+    const sharedBefore = sharedThreads().has(threadKey) || (!!thread && !ours && (await otherBotInThread(accountId, p.channel, thread, p.ts, l.slack?.botUserId)));
+    if (others.length) sharedThreads().add(threadKey);
+    // Unmentioned in its own thread: not when this very message calls on another bot (that one answers it).
+    mentioned = atApp ? !thread || !sharedBefore || others.length > 0 : !sharedBefore && !others.length;
+    if (atApp && !mentioned && l.owner === p.user)
+      void slackCall(accountId, "chat.postEphemeral", {
+        channel: p.channel,
+        user: p.user,
+        thread_ts: thread,
+        text: `${b.name} is staying out of this thread: another bot answers here too, so you'd get two answers. Mention me in the channel and I'll answer in a thread of my own.`,
+      }).catch(() => {});
+  }
   await messageIn(l.id, {
     chat: p.channel,
     messageId: p.ts,
@@ -855,21 +939,104 @@ async function slackMessage(links: ChannelLink[], p: SlackPayload, ownApp: boole
     fromName: (await slackName(accountId, p.user)) ?? "you",
     text: words,
     direct,
-    mentioned: atApp || inThread || named,
-    // Slack's files need the app's token, which only Composio has: pictures from Slack aren't passed on yet.
+    mentioned,
+    imageUrls: await slackPictures(l, p.files),
   }, pool);
+}
+
+const sharedThreads = () => (live.slackShared ??= new Set());
+const talked = () => (live.slackTalked ??= new Map());
+
+/** The other apps' bots a Slack message @mentions (people mentioned don't count). */
+async function otherBotsIn(accountId: string, text: string, ourUser?: string) {
+  const ids = [...new Set([...text.matchAll(/<@([UW][A-Z0-9]+)(?:\|[^>]*)?>/g)].map((m) => m[1]))].filter((u) => u !== ourUser).slice(0, 5);
+  const bots = await Promise.all(ids.map(async (u) => ((await slackUser(accountId, u))?.bot ? u : null)));
+  return bots.filter((u): u is string => !!u);
+}
+
+/**
+ * Whether another app's bot is already part of a Slack thread (it posted there, or someone mentioned
+ * it), read from the thread itself (conversations.replies): asked when our bot is mentioned in a thread
+ * it didn't start. Unreadable counts as yes: staying out is the safe side.
+ */
+async function otherBotInThread(accountId: string, channel: string, thread: string, now: string, ourUser?: string) {
+  const me = await slackMe();
+  const r = await slackCall<{ messages?: { ts?: string; bot_id?: string; text?: string }[] }>(accountId, "conversations.replies", { channel, ts: thread, limit: 200 }).catch(() => null);
+  if (!r) return true;
+  const before = (r.messages ?? []).filter((m) => m.ts !== now);
+  if (before.some((m) => m.bot_id && m.bot_id !== me?.bot_id)) return true;
+  for (const m of before) if ((await otherBotsIn(accountId, m.text ?? "", ourUser)).length) return true;
+  return false;
+}
+
+/**
+ * Pictures sent with a Slack message, for the bot to see: fetched with our own app's token (files:read),
+ * sent only to Slack's own file host. Through Composio there's no token to fetch them with.
+ */
+async function slackPictures(l: ChannelLink, files: SlackPayload["files"]) {
+  if (!files?.length || !isOwnSlack(l.slack?.accountId)) return undefined;
+  const { token } = await slackApp();
+  if (!token) return undefined;
+  const ours = (u: string) => {
+    try {
+      const host = new URL(u).host;
+      return host === "files.slack.com" || host === new URL(SLACK_API()).host;
+    } catch {
+      return false;
+    }
+  };
+  const pics = files
+    .map((f) => ({ url: f.url_private_download ?? f.url_private ?? "", type: f.mimetype }))
+    .filter((f) => /^image\//.test(f.type ?? "") && ours(f.url))
+    .map((f) => ({ ...f, headers: { Authorization: `Bearer ${token}` }, strict: true }));
+  return pics.length ? pics : undefined;
 }
 
 const escaped = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const byName = (links: ChannelLink[], text: string) => links.find((l) => new RegExp(`\\b${escaped(bot(l.botId)?.name ?? "\uFFFF")}\\b`, "i").test(text));
 
-const slackNames = new Map<string, string>();
-async function slackName(accountId: string, user: string) {
-  if (slackNames.has(user)) return slackNames.get(user);
-  const r = (await runAs(accountId, "SLACKBOT_RETRIEVE_DETAILED_USER_INFORMATION", { user }).catch(() => null)) as { user?: { real_name?: string; name?: string } } | null;
-  const name = r?.user?.real_name || r?.user?.name;
-  if (name) slackNames.set(user, name);
-  return name;
+/** A Slack person or bot user, by id (users.info, asked once): their name, and whether it's a bot. */
+const slackUsers = new Map<string, { name?: string; bot: boolean }>();
+async function slackUser(accountId: string, user: string) {
+  if (slackUsers.has(user)) return slackUsers.get(user);
+  const r = await slackCall<{ user?: { real_name?: string; name?: string; is_bot?: boolean } }>(accountId, "users.info", { user }).catch(() => null);
+  if (!r?.user) return undefined;
+  const who = { name: r.user.real_name || r.user.name, bot: !!r.user.is_bot };
+  slackUsers.set(user, who);
+  return who;
+}
+const slackName = async (accountId: string, user: string) => (await slackUser(accountId, user))?.name;
+
+/* ---------------- The front door on this Mac: where the bots are in Slack ---------------- */
+
+/** A Slack pairing code as the front door is told it: hashed (it only matches a message against it). */
+export const slackCodeHash = (code: string) => createHash("sha256").update(code.replace(/\s+/g, "")).digest("hex");
+
+/**
+ * Where this Bops' bots are in Slack through our own app, for the front door on this Mac (edge/,
+ * GET /api/channels/slack/routes), which every Bops here shares one app through: it sends each of the
+ * app's events to exactly one of them, by these. The workspace and the app's bot user; the channels
+ * the bots are in; the people paired; the codes waiting (hashed); the bots' names; the threads they
+ * started; and when each person last wrote to them directly.
+ */
+export async function slackRoutes(now = Date.now()) {
+  const me = await slackMe();
+  const own = linksOf("slack").filter((l) => isOwnSlack(l.slack?.accountId) && bot(l.botId));
+  const uniq = (xs: (string | undefined | null)[]) => [...new Set(xs.filter((x): x is string => !!x))].sort();
+  // Taken out of this Bops (the others keep it): nothing here for the front door to send.
+  const on = !!me && !getState().slackAppOff;
+  return {
+    instance: instanceId(),
+    name: instanceName(),
+    app: on ? { team: me.team_id, user: me.user_id ?? null, bot: me.bot_id ?? null } : null,
+    teams: uniq([me?.team_id, ...own.map((l) => l.slack!.teamId)]),
+    channels: uniq(own.flatMap((l) => l.slack!.channels.map((c) => c.id))),
+    owners: uniq(own.map((l) => l.owner)),
+    codes: own.filter((l) => pairCodeLive(l, now)).map((l) => slackCodeHash(l.pairCode)),
+    names: own.map((l) => ({ name: bot(l.botId)!.name, main: !!bot(l.botId)!.isMain })),
+    threads: [...live.slackThreads].slice(-2000),
+    talked: Object.fromEntries(talked()),
+  };
 }
 
 /* ---------------- Bops Cloud: where the bots are in Slack ---------------- */

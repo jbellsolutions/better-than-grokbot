@@ -4,10 +4,8 @@ import type { BusinessReconciliation } from "@/lib/business";
 
 function nextStep(hold: string) {
   if (/seed list/i.test(hold)) return "Read back seed-list membership, sending provider and current hourly/per-second limits. Save the provider response and time checked.";
-  if (/Agency:/i.test(hold)) return "Compare source files, writer output and the live loader/import counts. Reconcile the 900 and 461 reported counts before enabling the loader.";
-  if (/Flagship:/i.test(hold)) return "Read actual sender allocation, inbox health and daily limits in the provider. Keep rejected and NO-SEND pools excluded; document which capacity is usable.";
   if (/routine/i.test(hold)) return "Inventory every bot’s enabled routines, schedules and last runs. Identify reply and health routines separately from campaign sending routines.";
-  if (/Tony|invite/i.test(hold)) return "Read the actual calendar event, booking result and invitation-delivery evidence. Establish what failed before proposing a retry.";
+  if (/invite/i.test(hold)) return "Read the actual calendar event, booking result and invitation-delivery evidence. Establish what failed before proposing a retry.";
   if (/Sent|unsent/i.test(hold)) return "Check the provider’s Sent folder and message IDs for the recipient and date. Resolve the delivery status before proposing any resend.";
   if (/DMARC|capture page/i.test(hold)) return "Inspect the live page and current DNS records. Compare them with the proposed change and record what is actually deployed.";
   if (/forwarding|redirect rule/i.test(hold)) return "Recover the exact rule from the mailbox provider or its configuration export. Record its conditions and destination before changing anything.";

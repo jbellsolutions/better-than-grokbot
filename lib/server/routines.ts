@@ -54,7 +54,16 @@ export function createRoutine(
   schedule: Schedule,
   opts: { where?: Routine["where"]; reminder?: string; textTo?: Routine["textTo"] } = {},
 ): Routine {
-  const r: Routine = { id: id("rtn"), botId, title, goal, schedule, enabled: true, nextRunAt: nextRun(schedule), where: opts.where, reminder: opts.reminder?.trim() || undefined, textTo: opts.textTo };
+  if (!bot(botId)) throw Error("No such agent.");
+  if (!title.trim() || !goal.trim()) throw Error("A title and goal are required.");
+  if (!schedule || !["daily", "weekdays", "weekly", "once"].includes(schedule.kind)) throw Error("Choose a supported schedule.");
+  if (schedule.kind === "once") {
+    if (!Number.isFinite(schedule.at) || schedule.at <= Date.now()) throw Error("Choose a future time.");
+  } else {
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(schedule.time)) throw Error("Use a time in HH:MM format.");
+    if (schedule.kind === "weekly" && (!Number.isInteger(schedule.day) || schedule.day < 0 || schedule.day > 6)) throw Error("Choose a weekday.");
+  }
+  const r: Routine = { id: id("rtn"), botId, title: title.trim(), goal: goal.trim(), schedule, enabled: true, nextRunAt: nextRun(schedule), where: opts.where, reminder: opts.reminder?.trim() || undefined, textTo: opts.textTo };
   update((s) => s.routines.push(r));
   return r;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRememberedState } from "./use-remembered-state";
-import { createContext, Fragment, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createContext, Fragment, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { BLOCKER_ASK, live, pairChatId, TAPBACK_EMOJI, TAPBACKS, type AppApproval, type AppState, type Bot, type Chat, type Message, type Session, type Tapback } from "@/lib/types";
 import { Tapback as TapbackBalloon, TapbackGlyph, tapbackVars } from "@/components/message-ui/tapback";
 import { Mascot } from "./mascot";
@@ -9,6 +9,10 @@ import { OpenLink } from "./panel-tabs";
 import { ApprovalCard, MacIcon } from "./mac-tab";
 import { AttachmentTray, MessageImages, useAttachments } from "./attachments";
 import { ComposerInput } from "./composer-input";
+import { HermesScreen } from "./hermes-screen";
+import { workStatus } from "@/lib/work-status";
+import { approvalFields } from "@/lib/turn-text";
+import { LiveTurn, useChatStream } from "./turn-stream";
 import { ChatAvatar, chatName, clockTime, needsYou, post, StatusIcon, teamOf, useNow } from "./ui";
 
 /** Light markdown for bot text: **bold** and [links](url). */
@@ -205,7 +209,7 @@ export function ChatView({
   const appAsks = (state.appApprovals ?? []).filter((a) => a.chatId === c.id || state.sessions.some((x) => x.id === a.sessionId && x.chatId === c.id));
   const solo = c.kind === "bot" ? members[0] : undefined;
   // A bot's chat shows all its work; a group only the threads started in that group.
-  const running = state.sessions.filter((s) => live(s) && (c.kind === "group" ? s.chatId === c.id : c.botIds.includes(s.botId)));
+  const running = state.sessions.filter((s) => (live(s) || needsYou(s)) && (c.kind === "group" ? s.chatId === c.id : c.botIds.includes(s.botId)));
   const sessionById = (sid: string) => state.sessions.find((s) => s.id === sid);
   const chipsFor = (m: Message) => (m.sessionIds ?? []).filter((sid) => chipHome.get(sid) === m.id);
   const lastUserIdx = messages.map((m) => m.role).lastIndexOf("user");
@@ -231,6 +235,8 @@ export function ChatView({
     onShowMac,
   });
   const repliedAfterUser = messages.slice(lastUserIdx + 1).some((m) => m.role === "bot");
+  // Turns whose answer is saved: their provisional text gives way to the message.
+  const savedRuns = useMemo(() => new Set(messages.map((m) => m.runId).filter(Boolean) as string[]), [messages]);
 
   // Opening a chat lands on its latest message; only new messages in the open chat glide in.
   const shownChat = useRef<string | null>(null);
@@ -254,16 +260,27 @@ export function ChatView({
     if (followBottom.current) el.scrollTo({ top: el.scrollHeight, behavior: same ? "smooth" : "instant" });
     shownChat.current = c.id;
   }, [messages.length, c.typing.length, c.id]);
+  // A bot's answer growing as it's written keeps its latest line in view, unless the user scrolled up to read.
+  const keepLatestInView = useCallback(() => {
+    const el = scroller.current;
+    if (el && followBottom.current) el.scrollTop = el.scrollHeight;
+  }, []);
+  const lastTop = useRef(0);
 
   // Marked read only when there's something unread: each mark is a state change every open page reloads.
   const lastAt = messages.at(-1)?.at ?? 0;
   useEffect(() => {
-    if ((c.readAt ?? 0) >= lastAt) return;
-    void post(`/api/chats/${encodeURIComponent(c.id)}/read`);
-  }, [c.id, c.readAt, lastAt]);
+    const read = () => {
+      if (document.hidden || c.unread || (c.readAt ?? 0) >= lastAt) return;
+      void post(`/api/chats/${encodeURIComponent(c.id)}/read`, { through: lastAt });
+    };
+    read();
+    document.addEventListener("visibilitychange", read);
+    return () => document.removeEventListener("visibilitychange", read);
+  }, [c.id, c.readAt, c.unread, lastAt]);
 
   // What the user just sent shows at once, before the server has it (then the real message takes its place).
-  const [pending, setPending] = useState<{ id: string; chatId: string; text: string; at: number; previews?: string[] }[]>([]);
+  const [pending, setPending] = useState<{ id: string; chatId: string; text: string; at: number; previews?: string[]; error?: string; images?: Message["images"]; replyTo?: string }[]>([]);
   // Images about to go with the next message (the + button, pasting, or dropping them on the chat).
   const attach = useAttachments();
   const filePicker = useRef<HTMLInputElement>(null);
@@ -276,25 +293,36 @@ export function ChatView({
     setDraft("");
     setReplying(null);
     attach.clear();
-    const mine = { id: `pending_${Date.now()}`, chatId: c.id, text, at: Date.now(), previews: items.length ? items.map((a) => a.preview) : undefined };
+    const mine = { id: crypto.randomUUID(), chatId: c.id, text, at: Date.now(), previews: items.length ? items.map((a) => a.preview) : undefined };
     setPending((p) => [...p, mine]);
     // Shows at once; goes once its images have finished uploading (usually they already have).
     const images = (await Promise.all(items.map((a) => a.done))).filter((x) => !!x);
     if (!text && !images.length) return setPending((p) => p.filter((x) => x.id !== mine.id));
-    await post(`/api/chats/${encodeURIComponent(c.id)}/messages`, { text, replyTo: replying?.id, images: images.length ? images : undefined }).finally(() =>
-      setPending((p) => p.filter((x) => x.id !== mine.id)),
-    );
+    const outgoing = { ...mine, images: images.length ? images : undefined, replyTo: replying?.id };
+    setPending(p => p.map(m => m.id === mine.id ? outgoing : m));
+    await deliver(outgoing);
+
+  };
+  const deliver = async (message: (typeof pending)[number]) => {
+    setPending(p => p.map(m => m.id === message.id ? { ...m, error: undefined } : m));
+    try {
+      const res = await post(`/api/chats/${encodeURIComponent(message.chatId)}/messages`, { text: message.text, replyTo: message.replyTo, images: message.images, requestId: message.id });
+      if (!res.ok) throw Error((await res.json()).error || "Message was not accepted.");
+      setPending(p => p.filter(m => m.id !== message.id));
+    } catch (e) {
+      setPending(p => p.map(m => m.id === message.id ? { ...m, error: (e as Error).message } : m));
+    }
   };
   const filesOf = (d: DataTransfer | null) => [...(d?.files ?? [])].filter((f) => f.type.startsWith("image/"));
   // Sent messages the server's state doesn't have yet.
-  const waiting = pending.filter((p) => p.chatId === c.id && !messages.some((m) => m.role === "user" && m.text === p.text && m.at >= p.at - 5000));
+  const waiting = pending.filter((p) => p.chatId === c.id && !messages.some((m) => m.requestId === p.id));
 
   const status = c.typing.length
     ? c.kind === "group"
       ? `${c.typing.map((b) => state.bots.find((x) => x.id === b)?.name).join(", ")} typing…`
       : "Typing…"
     : running.length
-      ? `Working on ${running.length} thing${running.length === 1 ? "" : "s"}`
+      ? [...new Set(running.map(s => workStatus(s).label))].join(" · ")
       : solo
         ? solo.role
         : members.map((m) => m.name).join(", ") + " and you";
@@ -344,7 +372,12 @@ export function ChatView({
       </div>
       <div ref={scroller} onScroll={event => {
         const el = event.currentTarget;
-        followBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+        // Following stops only when the user scrolls up: a smooth scroll down passes through spots
+        // short of the bottom, and an answer can grow while it does.
+        const up = el.scrollTop < lastTop.current - 2;
+        lastTop.current = el.scrollTop;
+        if (el.scrollHeight - el.scrollTop - el.clientHeight < 40) followBottom.current = true;
+        else if (up) followBottom.current = false;
         try { localStorage.setItem(`bops:scroll:${c.id}`, JSON.stringify({ top: el.scrollTop, atBottom: followBottom.current })); } catch {}
       }} className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         {/* The header floats over the conversation: messages soften into a blur as they pass under it. */}
@@ -412,6 +445,7 @@ export function ChatView({
           {waiting.map((p) => (
             <div key={p.id} className="flex max-w-[86%] flex-col items-end gap-1 self-end">
               {p.previews && <MessageImages previews={p.previews} />}
+              {p.error && <button onClick={() => void deliver(p)} className="text-[12px] text-[#B42318]" title={p.error}>Send failed · Retry</button>}
               {p.text && <div className="whitespace-pre-wrap rounded-[18px] bg-[#0A0A0A] px-3.5 py-2 text-[14px] leading-5 text-white [overflow-wrap:anywhere]">{p.text}</div>}
             </div>
           ))}
@@ -428,13 +462,16 @@ export function ChatView({
                     <span className="text-[#6B6B6B]">{asking.name}…</span>
                   </span>
                 )}
-              <div className="flex items-end gap-2">
+              <div className="flex max-w-[86%] items-end gap-2">
                 {c.kind === "group" && tb && <Mascot botId={tb.id} color={tb.color} size={24} />}
-                <div className="flex items-center gap-[5px] rounded-[18px] bg-[#F2F2F0] px-4 py-[13px]">
-                  <span className="size-[7px] animate-pulse rounded-full bg-[#9A9A98]" />
-                  <span className="size-[7px] animate-pulse rounded-full bg-[#B5B5B2] [animation-delay:150ms]" />
-                  <span className="size-[7px] animate-pulse rounded-full bg-[#D9D9D6] [animation-delay:300ms]" />
-                </div>
+                {/* Its answer as it's written, with the tools it's using; the dots until then. */}
+                <LiveTurn chatId={c.id} botId={b} saved={(runId) => savedRuns.has(runId)} render={(text) => <Rich text={text} />} onGrow={keepLatestInView}>
+                  <div className="flex items-center gap-[5px] self-start rounded-[18px] bg-[#F2F2F0] px-4 py-[13px]">
+                    <span className="size-[7px] animate-pulse rounded-full bg-[#9A9A98]" />
+                    <span className="size-[7px] animate-pulse rounded-full bg-[#B5B5B2] [animation-delay:150ms]" />
+                    <span className="size-[7px] animate-pulse rounded-full bg-[#D9D9D6] [animation-delay:300ms]" />
+                  </div>
+                </LiveTurn>
               </div>
               </div>
             );
@@ -448,6 +485,7 @@ export function ChatView({
             <div className="absolute inset-0 backdrop-blur-[6px] [mask-image:linear-gradient(to_top,black_30%,transparent_75%)]" />
               <div className="absolute inset-0 bg-gradient-to-t from-white from-45% via-white/80 via-75% to-white/0" />
             </div>
+          <StreamOpen chatId={c.id} />
           {state.credits?.out && <OutOfCredit onUpgrade={onUpgrade} />}
           {appAsks.length > 0 && (
             <div className="mb-2.5 flex flex-col gap-2">
@@ -932,7 +970,7 @@ function MessageRow({ m, state, showSender, continued, sessionById, chipIds, onO
         </button>
       )}
       {chips
-        .filter((s) => s.askWhere && live(s))
+        .filter((s) => workStatus(s).kind === "location")
         .map((s) => (
           <div key={`${s.id}-where`} className="flex gap-1.5 pl-1">
             <button onClick={() => void post(`/api/sessions/${s.id}/where`, { to: "mac" })} className="flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-[12.5px] font-medium leading-4 text-white">
@@ -965,6 +1003,7 @@ function MessageRow({ m, state, showSender, continued, sessionById, chipIds, onO
             </div>
           </div>
         </div>
+        {m.delivery && <DeliveryStatus message={m} />}
         {m.via === "sms" && (
           <span data-tip="You texted this from your phone; the answer goes back by text" className="flex items-center gap-1 pr-1 text-[11.5px] leading-4 text-[#9A9A98]">
             <svg width="11" height="11" viewBox="0 0 16 16" aria-hidden className="shrink-0">
@@ -1015,7 +1054,7 @@ function MessageRow({ m, state, showSender, continued, sessionById, chipIds, onO
   if (m.role === "system")
     return (
       <div className="flex flex-col items-center gap-1.5 self-center py-0.5">
-        <div className="flex items-center gap-1.5 rounded-full bg-[#F7F7F6] px-3 py-1 text-[12px] leading-4 text-[#6B6B6B]">{m.text}</div>
+        {m.exchange ? <ExchangeLink message={m} /> : <div className="flex items-center gap-1.5 rounded-full bg-[#F7F7F6] px-3 py-1 text-[12px] leading-4 text-[#6B6B6B]">{m.text}</div>}
         {chipList}
       </div>
     );
@@ -1027,6 +1066,7 @@ function MessageRow({ m, state, showSender, continued, sessionById, chipIds, onO
       <div className="flex min-w-0 flex-col gap-1">
         {showSender && b && !continued && <div className="pl-3 text-[11px] leading-[14px] text-[#9A9A98]">{b.name}</div>}
         {!!m.asked?.length && <AskedLine state={state} asked={m.asked} by={m.botId} />}
+        {m.execution && <span className="pl-3 text-[10px] leading-4 text-[#9A9A98]" title="Model used for this reply, requested reasoning level, and total response time. Provider capabilities may adjust reasoning.">{m.execution.model} · {m.execution.requestedEffort} reasoning · {(m.execution.elapsedMs / 1000).toFixed(1)}s</span>}
         {quote}
         <div className={`flex min-w-0 max-w-full items-center gap-1 self-start ${m.reactions?.length ? "mt-3.5" : ""}`}>
           <div className="relative min-w-0" {...holdable}>
@@ -1071,6 +1111,30 @@ function MessageRow({ m, state, showSender, continued, sessionById, chipIds, onO
 
 /** Opens two bots' conversation with each other (from "Asked ● Sam" over a reply). */
 const PairOpen = createContext<(pairId: string, focusId?: string) => void>(() => {});
+
+function DeliveryStatus({ message: m }: { message: Message }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const retry = async () => {
+    setBusy(true); setError("");
+    try {
+      const res = await post(`/api/chats/${encodeURIComponent(m.chatId)}/messages`, { text: m.text, images: m.images, replyTo: m.replyTo, requestId: m.requestId });
+      if (!res.ok) throw Error((await res.json()).error || "Could not retry.");
+    } catch (e) { setError((e as Error).message); }
+    finally { setBusy(false); }
+  };
+  return <span className="text-[11px] text-[#9A9A98]">
+    {m.delivery === "failed" ? <button disabled={busy} onClick={() => void retry()} title={error || m.deliveryError} className="text-[#B42318]">{busy ? "Retrying…" : "Reply interrupted · Retry"}</button> : m.delivery === "queued" ? "Queued" : m.delivery === "running" ? "Working" : "Received"}
+  </span>;
+}
+
+function ExchangeLink({ message }: { message: Message }) {
+  const open = useContext(PairOpen);
+  return <button onClick={() => open(message.exchange!.pairId, message.exchange!.messageId)} className="max-w-full rounded-xl bg-[#F7F7F6] px-3 py-2 text-left text-[12px] leading-4 text-[#6B6B6B] hover:bg-[#EEEEEC]" title="Open agent conversation">
+    <span className="line-clamp-2">{message.text}</span>
+    <span className="mt-1 block text-[11px] font-medium">View agent conversation ↗</span>
+  </button>;
+}
 
 /** Over a reply: the teammates the bot asked first ("Asked ● Sam"). Click to open their conversation, at that exchange. */
 function AskedLine({ state, asked, by }: { state: AppState; asked: NonNullable<Message["asked"]>; by?: string }) {
@@ -1356,24 +1420,25 @@ function readableOn(hex: string) {
 /** A thread, collapsed to one line in the chat. Opens the thread sheet. */
 function SessionChip({ session: s, state, onClick }: { session: Session; state: AppState; onClick: () => void }) {
   const b = state.bots.find((x) => x.id === s.botId);
-  const waiting = needsYou(s);
+  const status = workStatus(s);
   return (
     <button
       onClick={onClick}
       className="flex max-w-full items-center gap-[9px] rounded-[14px] bg-white py-[9px] pl-3 pr-3.5 text-left shadow-[0_0_0_1px_#E6E6E3] hover:shadow-[0_0_0_1px_#C9C9C6]"
     >
       <StatusIcon session={s} size={14} dark />
-      <span className={`truncate text-[14px] leading-[18px] ${live(s) || waiting ? "text-ink" : "text-[#6B6B6B]"}`}>{s.title}</span>
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <span className={`truncate text-[14px] leading-[18px] ${live(s) || status.attention ? "text-ink" : "text-[#6B6B6B]"}`}>{s.title}</span>
+        <span className="text-[12px] leading-4 text-[#6B6B6B]">{status.text}</span>
+        {status.resourceWarning && <span className="text-[11px] text-[#B42318]">{status.resourceWarning}</span>}
+      </span>
       {/* Where it runs: the user's Mac or the cloud (deciding: nothing yet). */}
       {s.runsOn === "mac" ? (
         <span title="On your Mac" className="flex shrink-0 items-center gap-1 rounded-full bg-[#F2F2F0] px-1.5 py-px text-[11px] leading-[14px] text-[#3A3A38]">
           <MacIcon size={11} />
           Your Mac
         </span>
-      ) : s.askWhere && live(s) ? (
-        <span className="shrink-0 text-[12px] leading-4 text-[#6B6B6B]">· where?</span>
       ) : null}
-      {waiting && <span className="shrink-0 text-[12px] leading-4 text-[#6B6B6B]">· {s.blocker ? `needs ${BLOCKER_ASK[s.blocker]}` : "needs you"}</span>}
       {b && s.sentVia !== "you" && s.chatId !== `bot:${b.id}` && <span className="shrink-0 text-[12px] leading-4 text-[#9A9A98]">· {b.name}</span>}
     </button>
   );
@@ -1410,6 +1475,9 @@ export function ThreadSheet({ state, session: s, onClose, onShowComputer }: { st
   const [draft, setDraft] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [openSteps, setOpenSteps] = useState<number[]>([]);
+  const [actionError, setActionError] = useState("");
+  const [acting, setActing] = useState(false);
+  const status = workStatus(s);
   const end = useRef<HTMLDivElement>(null);
   const b = state.bots.find((x) => x.id === s.botId)!;
   const via = s.sentVia === "routine" ? undefined : s.sentVia === "you" ? b : state.bots.find((x) => x.id === s.sentVia);
@@ -1428,6 +1496,18 @@ export function ThreadSheet({ state, session: s, onClose, onShowComputer }: { st
     await post(`/api/sessions/${s.id}/reply`, { text });
   };
 
+  const remove = async () => {
+    setActing(true); setActionError("");
+    try {
+      const res = status.canStop
+        ? await post("/api/sessions", { sessionId: s.id }, "DELETE")
+        : await post(`/api/sessions/${s.id}`, {}, "DELETE");
+      if (!res.ok) throw Error((await res.json()).error || "Could not update this task.");
+      if (!status.canStop) onClose();
+    } catch (e) { setActionError((e as Error).message); }
+    finally { setActing(false); }
+  };
+
   return (
     // Clicking anywhere outside the sheet closes it, like the × does.
     <div onClick={onClose} className="absolute inset-0 z-20 flex flex-col bg-white/70 px-3 pb-3 pt-[52px] backdrop-blur-[2px]">
@@ -1438,10 +1518,10 @@ export function ThreadSheet({ state, session: s, onClose, onShowComputer }: { st
             <span className="truncate text-[15px] font-semibold leading-[18px]">{s.title}</span>
             <button onClick={onShowComputer} className="flex items-center gap-1.5 text-left text-[12px] leading-4 text-[#6B6B6B] hover:text-ink">
               {b.name} · {s.runsOn === "mac" ? "on your Mac · " : ""}
-              {s.askWhere && live(s) ? "waiting for you" : live(s) ? "working" : s.status === "done" ? "finished" : "stopped"} · {toolCount} steps
+              {status.text} · {toolCount} steps
             </button>
           </div>
-          {s.runsOn !== "mac" && state.mac?.ready && (s.blocker || s.status === "failed") && (
+          {s.runsOn !== "mac" && state.mac?.ready && (status.kind === "checkpoint" || status.kind === "failed") && (
             <button
               onClick={() => void post(`/api/sessions/${s.id}/where`, { move: true })}
               title="Do this on your Mac instead, where your apps and sign-ins are"
@@ -1451,27 +1531,28 @@ export function ThreadSheet({ state, session: s, onClose, onShowComputer }: { st
               Try on your Mac
             </button>
           )}
-          {live(s) ? (
-            <button onClick={() => void post("/api/sessions", { sessionId: s.id }, "DELETE")} className="rounded-full px-3 py-1.5 text-[13px] font-medium shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#F7F7F6]">
+          {status.canStop ? (
+            <button disabled={acting} onClick={() => void remove()} className="rounded-full px-3 py-1.5 text-[13px] font-medium shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#F7F7F6] disabled:opacity-50">
               Stop
             </button>
-          ) : (
+          ) : status.canDelete ? (
             <button
-              onClick={() => {
-                onClose();
-                void post(`/api/sessions/${s.id}`, {}, "DELETE");
-              }}
-              className="rounded-full px-3 py-1.5 text-[13px] font-medium text-[#B42318] shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#FEF3F2]"
+              disabled={acting}
+              onClick={() => void remove()}
+              className="rounded-full px-3 py-1.5 text-[13px] font-medium text-[#B42318] shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#FEF3F2] disabled:opacity-50"
             >
               Delete
             </button>
-          )}
+          ) : null}
           <button onClick={onClose} aria-label="Close thread" className="flex size-[34px] items-center justify-center rounded-full shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#F7F7F6]">
             <svg width="12" height="12" viewBox="0 0 12 12">
               <path d="M2 2l8 8M10 2l-8 8" fill="none" stroke="#0A0A0A" strokeWidth="1.6" strokeLinecap="round" />
             </svg>
           </button>
         </div>
+        {actionError && <p role="alert" className="px-4 pt-2 text-[12px] text-[#B42318]">{actionError}</p>}
+        {status.resourceWarning && <p className="px-4 pt-2 text-[12px] text-[#B42318]">{status.resourceWarning}</p>}
+        {s.coordinationReviewed && <p className="px-4 pt-2 text-[12px] text-[#6B6B6B]">{status.review}</p>}
 
         <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-[18px] pb-3 pt-4">
           <div className="flex w-[86%] flex-col items-end gap-1.5 self-end">
@@ -1494,7 +1575,7 @@ export function ThreadSheet({ state, session: s, onClose, onShowComputer }: { st
 
           <div className="flex flex-col gap-2.5 pt-1.5">
             {/* It can't start until the user says where: the choice is right here, not only in the chat. */}
-            {s.askWhere && live(s) && (
+            {status.kind === "location" && (
               <div className="flex flex-col gap-2 rounded-[14px] bg-[#FBFFD9] px-3.5 py-3 shadow-[0_0_0_1px_#E8F28A]">
                 <span className="text-[13.5px] font-medium leading-[18px]">Where should {b.name} do this?</span>
                 <span className="text-[12.5px] leading-[17px] text-[#6B6B6B]">It starts as soon as you pick. Your messages here go along with it.</span>
@@ -1510,7 +1591,7 @@ export function ThreadSheet({ state, session: s, onClose, onShowComputer }: { st
               </div>
             )}
             <span className="text-[13px] leading-4 text-[#9A9A98]">
-              {s.askWhere && live(s) ? `Waiting for you for ${since(started)}` : live(s) ? `Working for ${since(started)}` : s.status === "queued" ? "Up next" : `Worked for ${since(started, s.endedAt)}`}
+              {status.kind === "running" ? `Working for ${since(started)}` : status.kind === "starting" ? `Starting · ${since(started)}` : status.kind === "queued" ? "Queued · waiting to start" : status.attention ? status.label : s.endedAt ? `Recorded task duration · ${since(started, s.endedAt)}` : "No end time recorded"}
               {s.helperNames?.length
                 ? ` · with helpers ${s.helperNames.join(", ")}`
                 : live(s) && s.helperScreens?.length
@@ -1570,7 +1651,7 @@ export function ThreadSheet({ state, session: s, onClose, onShowComputer }: { st
           {s.status === "failed" && s.error && (
             <div className="rounded-xl bg-[#FBFFE0] px-3 py-2.5 text-[13px] leading-5 shadow-[0_0_0_1px_#E6F57A]">{s.error}</div>
           )}
-          {live(s) && <span className="animate-pulse text-[14px] leading-[18px] text-[#B5B5B2]">{s.status === "queued" ? "Queued" : "Thinking"}</span>}
+          {["queued", "starting", "running"].includes(status.kind) && <span className="animate-pulse text-[14px] leading-[18px] text-[#B5B5B2]">{status.label}</span>}
           <div ref={end} />
         </div>
 
@@ -1591,7 +1672,7 @@ export function ThreadSheet({ state, session: s, onClose, onShowComputer }: { st
               id="thread-reply"
               value={draft}
               onChange={setDraft}
-              placeholder={live(s) ? "Reply in thread · goes in after this step" : "Reply in thread · picks it back up"}
+              placeholder={s.hermesHelpId ? "Reply in thread · checkpoint stays paused" : live(s) ? "Reply in thread · goes in after this step" : "Reply in thread · picks it back up"}
               className="min-w-0 flex-1 bg-transparent py-[6px] text-[14px] leading-[18px] outline-none placeholder:text-[#9A9A98]"
             />
             <button type="submit" aria-label="Send" disabled={!draft.trim()} className="flex size-[30px] items-center justify-center rounded-full bg-ink disabled:opacity-30">
@@ -1788,24 +1869,35 @@ function CloudIcon() {
  * replies it offered, retry, or move it to their Mac, instead of working out what to type back.
  */
 function NeedsYouCard({ session: s, state, quote, onShow, onSomethingElse }: { session: Session; state: AppState; quote?: boolean; onShow: () => void; onSomethingElse: () => void }) {
+  const status = workStatus(s);
   const [busy, setBusy] = useState(false);
+  const [screenOpen, setScreenOpen] = useState(false);
   const b = state.bots.find((x) => x.id === s.botId);
   const name = b?.name ?? "The bot";
-  const reply = async (text: string) => {
+  const [handoffError, setHandoffError] = useState("");
+  const reply = async (text: string, handoff = false) => {
     setBusy(true);
-    await post(`/api/sessions/${s.id}/reply`, { text });
-    setBusy(false);
+    setHandoffError("");
+    try {
+      const res = await post(`/api/sessions/${s.id}/reply`, { text, handoff, helpId: s.hermesHelpId });
+      if (!res.ok) throw Error((await res.json()).error || "Could not resume this task.");
+    } catch (e) { setHandoffError((e as Error).message); }
+    finally { setBusy(false); }
   };
   const toMac = s.runsOn !== "mac" && !!state.mac?.ready;
   // Dismiss means done with it: the thread stops and never asks again.
-  const dismiss = () => {
-    setBusy(true);
-    void post(`/api/sessions/${s.id}`, { dismiss: true }, "PATCH");
+  const dismiss = async () => {
+    setBusy(true); setHandoffError("");
+    try {
+      const res = await post(`/api/sessions/${s.id}`, { dismiss: true }, "PATCH");
+      if (!res.ok) throw Error((await res.json()).error || "Could not dismiss this task.");
+    } catch (e) { setHandoffError((e as Error).message); }
+    finally { setBusy(false); }
   };
-  const failed = s.status === "failed";
-  const title = s.blocker ? `${name} needs ${BLOCKER_ASK[s.blocker]}` : failed ? `${name} couldn't finish` : `${name} is waiting on you`;
+  const failed = status.kind === "failed";
+  const title = status.kind === "uncertain" ? `${name} · checkpoint uncertain` : status.checkpoint ? `${name} needs ${BLOCKER_ASK[status.checkpoint]}` : failed ? `${name} couldn't finish` : `${name} · ${(status.attentionLabel || status.label).toLowerCase()}`;
   // The question itself, so the card says what to answer (the last sentence that asks something).
-  const question = quote && !s.blocker && !failed ? (s.answer ?? "").split(/(?<=[.!?])\s+|\n+/).reverse().find((x) => x.trim().endsWith("?"))?.trim() : undefined;
+  const question = quote && status.kind === "waiting" ? (s.answer ?? "").split(/(?<=[.!?])\s+|\n+/).reverse().find((x) => x.trim().endsWith("?"))?.trim() : undefined;
   const show: Record<string, string> = { sign_in: `Sign in for ${name}`, two_factor: "Enter the code", captcha: "Solve the check", payment: "Review the payment", error: "Look at the screen" };
   const primary = "rounded-full bg-ink px-3.5 py-1.5 text-[13px] font-semibold leading-4 text-white disabled:opacity-50";
   const plain = "rounded-full bg-white px-3.5 py-1.5 text-[13px] font-medium leading-4 shadow-[0_0_0_1px_#E2E2DF] hover:bg-[#F7F7F6] disabled:opacity-50";
@@ -1816,12 +1908,18 @@ function NeedsYouCard({ session: s, state, quote, onShow, onSomethingElse }: { s
         {title}
       </span>
       {question && <span className="-mt-1 pl-4 text-[13.5px] leading-[19px] text-[#3A3A38]">{question}</span>}
+      {handoffError && <span role="alert" className="text-[12px] text-[#B42318]">{handoffError}</span>}
       <div className="flex flex-wrap gap-1.5">
-        {s.blocker ? (
+        {status.kind === "uncertain" || status.kind === "location" ? (
+          <button disabled={busy} onClick={onSomethingElse} className={primary}>View task</button>
+        ) : status.checkpoint ? (
           <>
-            <button disabled={busy} onClick={onShow} className={primary}>
-              {show[s.blocker]}
+            <button disabled={busy} onClick={() => s.runtime === "hermes" && s.hermesHelpId ? setScreenOpen(true) : onShow()} className={primary}>
+              {show[status.checkpoint]}
             </button>
+            {s.blocker !== "payment" && <button disabled={busy || s.runtime === "hermes" && !s.hermesHelpId} title={s.runtime === "hermes" && !s.hermesHelpId ? "Checkpoint identity unavailable" : undefined} onClick={() => void reply("Continue the original task.", true)} className={plain}>
+              I’m done · Continue
+            </button>}
             {toMac && (
               <button disabled={busy} onClick={() => void post(`/api/sessions/${s.id}/where`, { move: true })} className={plain}>
                 Try on your Mac
@@ -1868,6 +1966,7 @@ function NeedsYouCard({ session: s, state, quote, onShow, onSomethingElse }: { s
           </>
         )}
       </div>
+      {screenOpen && s.hermesHelpId && <HermesScreen session={s} name={name} onClose={() => setScreenOpen(false)} />}
     </div>
   );
 }
@@ -1886,10 +1985,19 @@ function AppApprovalCard({ state, approval: a }: { state: AppState; approval: Ap
   const [busy, setBusy] = useState(false);
   const b = state.bots.find((x) => x.id === a.botId);
   const s = state.sessions.find((x) => x.id === a.sessionId);
-  const decide = async (yes: boolean) => {
+  const chatId = a.chatId ?? s?.chatId;
+  const email = a.app === "email";
+  // The answer is an AG-UI resume of the approval's interrupt (its id without dashes).
+  const decide = async (confirmed: boolean, always = false) => {
     setBusy(true);
-    await post("/api/apps/approvals", { id: a.id, yes });
+    const interruptId = a.id.replaceAll("-", "").toLowerCase();
+    const body = { threadId: chatId, runId: crypto.randomUUID(), messages: [], tools: [], context: [], state: {}, forwardedProps: { command: { resume: { [interruptId]: { confirmed, always } } } } };
+    if (!chatId || !/^[0-9a-f]{32}$/.test(interruptId)) return void (await post("/api/apps/approvals", { id: a.id, yes: confirmed, always }));
+    const res = await post(`/api/chat/${encodeURIComponent(chatId)}/stream`, body);
+    // The run goes on until the action has run; the card goes when the approval does (the state says so).
+    void res.body?.pipeTo(new WritableStream()).catch(() => {});
   };
+  const fields = approvalFields(a.detail);
   const btn = "rounded-full px-3 py-1.5 text-[12.5px] font-medium leading-4 disabled:opacity-50";
   return (
     <div className="flex flex-col gap-2.5 rounded-2xl bg-white p-3.5 shadow-[0_0_0_1px_#0000000F,0_10px_30px_-16px_#00000059]">
@@ -1899,20 +2007,43 @@ function AppApprovalCard({ state, approval: a }: { state: AppState; approval: Ap
           <span className="text-[13.5px] font-semibold leading-[18px]">
             {b?.name ?? "A bot"} wants to: {a.title}
           </span>
-          {s && <span className="truncate text-[12px] leading-4 text-[#6B6B6B]">For &ldquo;{s.title}&rdquo;</span>}
+          <span className="truncate text-[12px] leading-4 text-[#6B6B6B]">
+            {a.effect === "destructive" ? "Can\u2019t be undone" : email ? "Sends an email" : "Changes something"}
+            {s && <> · For &ldquo;{s.title}&rdquo;</>}
+          </span>
         </div>
       </div>
-      {a.detail && <pre className={`${a.app === "email" ? "max-h-[280px]" : "max-h-[180px]"} overflow-y-auto whitespace-pre-wrap rounded-xl bg-[#F7F7F6] px-3 py-2 font-sans text-[12.5px] leading-[18px] text-[#3A3A38] [overflow-wrap:anywhere]`}>{a.detail}</pre>}
-      <div className="flex gap-1.5">
+      {!!fields.length && (
+        <dl className={`${email ? "max-h-[280px]" : "max-h-[180px]"} grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 overflow-y-auto rounded-xl bg-[#F7F7F6] px-3 py-2 text-[12.5px] leading-[18px] text-[#3A3A38]`}>
+          {fields.map((f, i) => (
+            <Fragment key={i}>
+              <dt className="text-[#6B6B6B]">{f.label}</dt>
+              <dd className="whitespace-pre-wrap [overflow-wrap:anywhere]">{f.value}</dd>
+            </Fragment>
+          ))}
+        </dl>
+      )}
+      <div className="flex flex-wrap gap-1.5">
         <button disabled={busy} onClick={() => void decide(true)} className={`${btn} bg-ink text-white`}>
-          {a.app === "email" ? "Send" : "Do it"}
+          {email ? "Send" : "Allow once"}
         </button>
+        {a.allowAlways && !email && a.effect !== "destructive" && (
+          <button disabled={busy} onClick={() => void decide(true, true)} className={`${btn} bg-[#F2F2F0] hover:bg-[#EAEAE7]`} title={`${b?.name ?? "This bot"} does this without asking from now on. You can undo it on its profile.`}>
+            Always allow
+          </button>
+        )}
         <button disabled={busy} onClick={() => void decide(false)} className={`${btn} bg-[#F2F2F0] hover:bg-[#EAEAE7]`}>
-          {a.app === "email" ? "Don\u2019t send" : "Don\u2019t"}
+          {email ? "Don\u2019t send" : "Deny"}
         </button>
       </div>
     </div>
   );
+}
+
+/** Keeps the open chat's turn stream connected, so an answer's first words show the moment they're written. */
+function StreamOpen({ chatId }: { chatId: string }) {
+  useChatStream(chatId);
+  return null;
 }
 
 /**

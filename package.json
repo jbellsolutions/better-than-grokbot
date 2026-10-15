@@ -27,6 +27,7 @@
     "site:package": "node scripts/package-site.cjs"
   },
   "dependencies": {
+    "@ag-ui/core": "1.0.1",
     "@base-ui/react": "^1.8.0",
     "@composio/core": "^0.22.0",
     "@composio/openai": "^0.13.0",

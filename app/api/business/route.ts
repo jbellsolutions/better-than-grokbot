@@ -40,6 +40,11 @@ export async function POST(request: Request) {
     try {
         assertBusiness();
         const body = await request.json();
+        if (body.action === 'screen-input') {
+            const s = getState().sessions.find(s => s.id === body.sessionId);
+            if (!s?.hermesTurn || s.runtime !== 'hermes' || s.taskMode !== 'screen' || !s.hermesHelpId || s.hermesHelpId !== body.helpId || !s.blocker || s.dismissed) throw Error('This screen is no longer waiting for you');
+            return Response.json(await orgo.hermes({ action: 'input', turn: s.hermesTurn, helpId: s.hermesHelpId, input: body.input }));
+        }
         if (body.action === 'request-screens')
             return Response.json(addScreenRequest(String(body.reason || ''), body.requested));
         if (body.action === 'contact')

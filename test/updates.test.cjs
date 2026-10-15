@@ -11,9 +11,9 @@ test('update checks establish a quiet baseline, notify only changes, and preserv
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   fs.mkdirSync(path.join(root, '.data'));
   fs.writeFileSync(path.join(root, '.data/state.json'), '{"bots":[]}');
-  let version = '0.0.21', offline = false, syncOffline = false, syncCalls = 0;
+  let version = '0.0.21', offline = false;
   const logs = [], errors = [];
-  const context = { require: name => name === './sync-upstream.cjs' ? { syncUpstream: dir => { assert.equal(dir, root); syncCalls++; if (syncOffline) throw Error('Sync offline'); } } : name === 'node:os' ? { homedir: () => root } : require(name), __dirname: path.join(root, 'scripts'), process: { env: { BOPS_PROJECT_DIR: root, BOPS_NO_NOTIFY: '1' }, pid: process.pid, platform: 'darwin' }, console: { log: s => logs.push(s), error: s => errors.push(s) }, AbortSignal, Date, fetch: async (url, options) => {
+  const context = { require: name => name === 'node:os' ? { homedir: () => root } : require(name), __dirname: path.join(root, 'scripts'), process: { env: { BOPS_PROJECT_DIR: root, BOPS_NO_NOTIFY: '1' }, pid: process.pid, platform: 'darwin' }, console: { log: s => logs.push(s), error: s => errors.push(s) }, AbortSignal, Date, fetch: async (url, options) => {
     assert.equal(options.headers.Authorization, undefined);
     if (offline) return new Response('', { status: 503 });
     return Response.json(url.includes('latest.json') ? { version, released: version, notes: ['Release note'] } : url.includes('/commits/') ? { sha: 'a'.repeat(40), commit: { message: 'Source change' } } : { tag_name: 'v0.0.6', id: 1, updated_at: 'today' });
@@ -29,12 +29,10 @@ test('update checks establish a quiet baseline, notify only changes, and preserv
   const status = JSON.parse(fs.readFileSync(path.join(root, '.data/updates.json')));
   assert.equal(status.sources[0].version, '0.0.22');
   assert.equal(status.errors.length, 3);
-  offline = false; syncOffline = true; await context.main();
-  const syncStatus = JSON.parse(fs.readFileSync(path.join(root, '.data/updates.json')));
-  assert.equal(syncStatus.errors.length, 1);
-  assert.match(syncStatus.errors[0], /Upstream source sync failed/);
-  assert.equal(syncStatus.sources.length, 3);
-  assert.equal(syncCalls, 6);
+  offline = false; await context.main();
+  const back = JSON.parse(fs.readFileSync(path.join(root, '.data/updates.json')));
+  assert.equal(back.errors.length, 0);
+  assert.equal(back.sources.length, 3);
   const backup = path.join(root, 'Library/Application Support/Bops Self-Hosted/backups', `state-${new Date().toISOString().slice(0, 10)}`, 'state.json');
   assert.equal(fs.statSync(backup).mode & 0o777, 0o600);
 });
@@ -54,4 +52,16 @@ test('installer refuses busy tasks and restores the login service after build fa
   assert.ok(calls.some(([cmd]) => cmd === 'restore-build'));
   assert.equal(calls.at(-1)[1][0], 'bootstrap');
   assert.ok(!calls.some(([cmd]) => cmd === '/usr/bin/ditto'));
+});
+
+test('an installed app still opens when deleting the previous bundle fails', async () => {
+  const calls = [], warnings = [];
+  const context = { require: name => name === '../desktop/instances.cjs' ? { readRegistry: () => [] } : name === 'node:fs' ? {
+    existsSync: p => !p.includes('build-rollback'), mkdtempSync: () => '/tmp/bops-build-rollback-test', realpathSync: p => p, cpSync: () => {}, renameSync: () => {},
+    rmSync: (p, options) => { if (p.includes('previous-')) { assert.equal(options.maxRetries, 10); throw Error('ENOTEMPTY'); } },
+  } : name === 'node:child_process' ? { execFileSync: (cmd, args) => { calls.push([cmd,args]); if (cmd === '/usr/libexec/PlistBuddy') return args[1].includes('CFBundleIdentifier') ? 'ai.orgo.bops.selfhosted\n' : '/project\n'; } } : require(name),
+  __dirname: '/project/scripts', process: { platform: 'darwin', getuid: () => 501, pid: 123 }, fetch: async () => Response.json({ state: { sessions: [], chats: [] } }), AbortSignal,
+  console: { log: () => {}, error: () => {}, warn: text => warnings.push(text) } };
+  vm.runInNewContext(install, context); await context.main();
+  assert.equal(calls.at(-1)[0], '/usr/bin/open'); assert.equal(warnings.length, 1); assert.match(warnings[0], /previous bundle kept/);
 });

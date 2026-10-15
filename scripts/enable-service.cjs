@@ -14,7 +14,7 @@ async function main() {
     responding = true;
     ({ state } = await r.json());
   } catch (e) { if (e.message === 'Could not verify the process on port 3210.') throw e; }
-  if (state?.sessions.some(s => ['starting', 'running', 'queued'].includes(s.status)) || state?.chats.some(c => c.typing?.length)) throw Error('Wait until active work finishes.');
+  if (state?.sessions.some(s => ['starting', 'running', 'queued'].includes(s.status) || !!s.hermesHelpId) || state?.chats.some(c => c.typing?.length)) throw Error('Wait until active work finishes.');
   if (responding && !fs.existsSync(path.join(root, '.data/service.json'))) throw Error('Close the standalone Bops server before enabling the login service.');
   const label = 'ai.orgo.bops.selfhosted.server';
   const agentDir = path.join(os.homedir(), 'Library/LaunchAgents');

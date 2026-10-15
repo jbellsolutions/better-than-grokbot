@@ -12,6 +12,7 @@ test('a textual null from model routing cannot schedule an unintended Mac follow
   const code = ts.transpileModule(declaration.getText(source), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
   const state = { host: 'orgo', sessions: [] };
   const context = { exports: {}, process: { env: {} }, getState: () => state, update: fn => fn(state), id: () => 'setup-check',
+    MAC_WORDS: /on my Mac/i, bot: () => undefined,
     botChatId: id => `bot:${id}`, sameJob: () => undefined, retireCopies: () => {}, route: () => {}, pump: () => {} };
   vm.runInNewContext(code, context);
   for (const thenOnMac of [null, undefined, '', 'null', ' NULL ', 'undefined', 'none']) {
@@ -45,6 +46,7 @@ function runner(streams) {
   } } } };
   const mod = load('lib/server/openrouter-agent.ts', {
     './openai-client': { openaiClient: () => api },
+    './store': { bot: () => ({ effort: 'low' }) },
     './models': { modelFor: () => 'qwen/test', modelReasoning: async () => ({ effort: 'low' }) },
     './orgo': { orgo: { bash: async (_id, command) => {
       const r = JSON.parse(Buffer.from(/'([^']+)'$/.exec(command)[1], 'base64').toString());

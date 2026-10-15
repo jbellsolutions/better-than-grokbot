@@ -1,4 +1,5 @@
 "use client";
+import { workStatus } from "@/lib/work-status";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AppState, Bot, Session } from "@/lib/types";
@@ -203,6 +204,7 @@ export function BotMemory({ state, bot: b, onOpenThread }: { state: AppState; bo
                           <span className="min-w-0 flex-1 truncate text-[14px] font-medium leading-5">{s.title}</span>
                           <span className="shrink-0 text-[12px] text-[#9A9A98]">{ago(s.endedAt ?? s.createdAt)}</span>
                         </span>
+                        <span className="block text-[12px] leading-4 text-[#6B6B6B]">{workStatus(s).text}</span>
                         {s.answer && <span className="line-clamp-1 text-[13px] leading-[18px] text-[#6B6B6B]">{s.answer.replace(/\*\*|\[|\]\([^)]*\)/g, "")}</span>}
                       </span>
                     </button>

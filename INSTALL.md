@@ -1,33 +1,183 @@
 # Install Better Than GrokBot with Claude Code or Codex
 
-Give your coding agent this repository link:
+Paste this repository's link into Claude Code or Codex and say:
 
-**https://github.com/jbellsolutions/better-than-grokbot**
+> **Install Better Than GrokBot on this computer. Follow INSTALL.md.**
 
-Say: **“Install Better Than GrokBot on this computer. Follow INSTALL.md, start the local app, and walk me through the startup checklist.”**
+Your coding agent installs and starts the app, asks you for your keys one at a time, and then asks
+about your agents: bring your own charters, get help writing them, or start with the default team
+(a lead plus a Head of Operations) and grow from there. It starts as a blank canvas: no agents,
+data or accounts but yours.
 
-The agent handles checkout, dependencies, environment setup and starting the app. You supply your own accounts and decide what the agents can access. Aim for about 30 minutes with prerequisites and keys ready; setup time varies.
+You need a Mac (Apple silicon for the optional native app), Node.js 24 or newer, Git, and an
+OpenRouter or OpenAI API key. Everything else is optional and can be added later.
+
+---
 
 ## Instructions for the installing agent
 
-1. Read this file, README.md and AGENTS.md. Use a new folder named `Better-Than-GrokBot`, or reuse a verified existing checkout. Do not overwrite another app, existing environment files or saved state. Inspect the operating system and Node version first; Node.js 24+ and Git are required. Explain and obtain authorization before changing system tools on the user's computer.
-2. Clone this public repository, or use the free source ZIP linked in README.md. Run `npm ci` from its root. No paid software subscription is required. Do not buy cloud resources or subscriptions as part of installation.
-3. If `.env.local` does not exist, copy `.env.example` to it and protect it with `chmod 600 .env.local` on macOS/Linux. Keep `BOPS_SELF_HOSTED=1`. Use existing authorized credentials when available. Otherwise collect missing credentials using the coding agent's secure credential workflow. Do not print, commit or include keys in screenshots or logs.
-4. Configure the user's OpenRouter or supported OpenAI provider. For OpenRouter, set `OPENROUTER_API_KEY` and tool/image-capable `BOPS_CHAT_MODEL`, `BOPS_SESSION_MODEL` and `BOPS_HARD_MODEL` choices. Explain listed model rates and that provider usage is billed separately. Never invent a key or silently substitute someone else's account.
-5. Cloud computer work requires the user's Orgo account and `ORGO_API_KEY`, plus a running desktop. Prefer an existing authorized computer; do not delete, reset or resize it. Follow README.md for workspace/template and computer selection. If the account or desktop is not ready, report that cloud tasks remain unconfigured rather than claiming a complete setup.
-6. Start the browser coordinator with `npm run dev -- --port 3210`, listening locally. If that port is occupied, verify the existing service before starting a second copy. Keep the server running, verify HTTP 200 at http://localhost:3210, and open the app for the user. This path does not require building the optional native relay helper.
-7. Walk through the startup checklist below. Verify a minimal chat reply after permission to incur provider usage. For a computer check, use a harmless read-only task with approval. Report what works and what is still missing. Do not promise readiness until the required accounts and checks pass.
+Work through these steps in order. Ask one question at a time and wait for the answer. Never print,
+log or commit a key, and never invent one or use an account that isn't the user's. Don't buy
+anything, and don't change system tools without asking first.
+
+### 1. Check the computer
+
+- `node --version` must be 24 or newer; `git --version` must work. If either is missing, explain
+  how to install it (nodejs.org, or `brew install node git`) and ask before installing anything.
+- Note free disk space: dependencies and a build take a few GB.
+
+### 2. Get the code and install it
+
+- Clone into a new folder (`better-than-grokbot`), or reuse a checkout of this repository that is
+  already there. Never overwrite another app, an existing `.env.local` or an existing `.data/`.
+- From its root: `npm ci`.
+- If `.env.local` doesn't exist: `cp .env.example .env.local && chmod 600 .env.local`.
+  Keep `BOPS_SELF_HOSTED=1` in it.
+
+### 3. Ask for the keys, one at a time
+
+For each key below, tell the user what it does, where to get it and whether it's required, then ask
+for it. Offer two ways to put it in:
+
+- **Private (recommended):** the user runs this in their own terminal, which hides what they paste:
+  `node scripts/set-key.cjs <NAME>`
+- **Through you:** they paste it in the chat and you write it with
+  `printf %s '<value>' | node scripts/set-key.cjs <NAME>`. Tell them the key is then in this chat's
+  history, and to rotate it later if that matters to them.
+
+Never echo a key back. Skip any optional key the user doesn't want now; it can be added later the same
+way (restart the app to load it).
+
+| Setting | What it's for | Where to get it | Needed? |
+|---|---|---|---|
+| `OPENROUTER_API_KEY` | The bots' thinking (chat and tasks), any model on OpenRouter | openrouter.ai → Keys | One of these two is **required** |
+| `OPENAI_API_KEY` | Same, through OpenAI directly; also live voice calls | platform.openai.com → API keys | (see above) |
+| `ORGO_API_KEY` | Each bot's own cloud computer (browser, desktop, four screens) | orgo.ai → API keys | Recommended |
+| `COMPOSIO_API_KEY` | Gmail, Calendar, Slack, Notion, HubSpot and ~1,000 more apps | composio.dev → API keys | Optional |
+| `HONCHO_API_KEY` | Long-term memory across conversations | honcho.dev | Optional |
+| `AGENTMAIL_API_KEY` | An email inbox for every bot | agentmail.to | Optional |
+| `TYPESAFE_API_KEY` | Small, fast judgment calls | typesafe | Optional |
+| `AGENTPHONE_API_KEY` | Texts and calls to a bot's phone number (also needs a public address, README → Texts and calls) | agentphone.to | Optional |
+
+With OpenRouter, also set the models (they must support tools and images), for example:
+`BOPS_CHAT_MODEL`, `BOPS_SESSION_MODEL` and `BOPS_HARD_MODEL` = `z-ai/glm-5.3-flash`. The user can
+change them later in **Settings → Models**. Mention that providers bill their usage separately.
+
+### 4. Build and start
+
+```bash
+npm run build
+npx next start --port 3210 --hostname 127.0.0.1
+```
+
+Run the server in the background and keep it running. If port 3210 is taken, check what is there
+(`curl -s http://127.0.0.1:3210/api/health`) before starting a second copy. When
+`curl -s http://127.0.0.1:3210/api/health` answers `{"bops":true,…}`, open http://localhost:3210
+for the user. For development, `npm run dev -- --port 3210` works too.
+
+### 5. Who the bots work for
+
+Ask the user's name and one or two lines about them and their business, then save it (the same as
+**Settings → You**; every bot reads it):
+
+```bash
+curl -s -X POST http://127.0.0.1:3210/api/owner -H 'content-type: application/json' \
+  -d '{"name":"<their name>","about":"<a line or two about them and their business>"}'
+```
+
+### 6. Ask about charters
+
+A charter is what an agent is for: its job, what it may do on its own, and what it must ask first.
+Ask:
+
+> **Do you have charters for the agents you want? You can paste them, I can help you write them, or
+> we can start with the default team and add agents later.**
+
+- **They have charters:** for each one, confirm the agent's name, and condense its charter into a
+  role of at most 500 characters: its job, what it may do on its own and what needs approval. That
+  role is what the agent reads in every conversation. Create it:
+
+  ```bash
+  curl -s -X POST http://127.0.0.1:3210/api/bots -H 'content-type: application/json' \
+    -d '{"name":"<Name>","role":"<role, up to 500 characters>"}'
+  ```
+
+  Save each full charter as `charters/<name>.md` in the checkout (that folder is git-ignored) so the
+  user keeps the long version.
+- **They want help:** interview them, one question at a time: what the business does, what work
+  they want off their plate, and which jobs that makes (a writer, a researcher, a bookkeeper…). For
+  each job, draft a charter (job, tools, what it may do alone, what needs their OK), show it, revise
+  it until they approve, then create the agent as above.
+- **They want to start simple:** do nothing. Every new team already has a lead (Boppy) and a Head of
+  Operations (Bapi), who can create and remove specialists as the work needs them. Tell the user they
+  can ask Bapi in the chat for any agent they want.
+
+List the team to confirm: `curl -s http://127.0.0.1:3210/api/state | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).state.bots.map(b=>b.name+': '+b.role).join('\n')))"`
+
+### 7. First check
+
+With the user's permission (it uses their model provider), send a short message to the lead in the
+app and confirm a reply comes back. If `ORGO_API_KEY` is set, ask before running a harmless read-only
+computer task. Report plainly what works and what is still missing.
+
+### 8. Optional next steps (only if the user wants them)
+
+- **Keep it running** when the terminal closes and after restarts: `npm run service:enable`
+  (README → Self-host it).
+- **Native Mac app:** `npm run app:build` (README).
+- **Slack (beta):** below.
+- **Texts and calls:** README → Texts and calls.
 
 ## Startup checklist
 
-- [ ] Local workspace opens at http://localhost:3210.
-- [ ] Your provider account and model choices are connected.
-- [ ] Your name, business context and agent roles are configured.
-- [ ] For cloud work: a running Orgo desktop is connected and a read-only check passes.
-- [ ] For Mac work: Codex is signed in and macOS computer-use permissions are ready.
-- [ ] Approval boundaries are agreed before sending messages or changing external systems.
-- [ ] A first small task returns a result you can verify.
+- [ ] The app opens at http://localhost:3210.
+- [ ] A model provider key is set, and a chat reply comes back.
+- [ ] Your name and business are set.
+- [ ] Your agents exist: your charters, or the default lead and Head of Operations.
+- [ ] For cloud computer work: an Orgo key is set and a read-only check passes.
+- [ ] You know which actions the bots will ask you to approve (sending, posting, paying, deleting).
 
-Keep the coordinator running while using it. The optional Apple silicon native build and background services have additional setup; see README.md. The upstream relay helper currently requires access to a private upstream repository, so do not block the browser installation on it or claim an unsigned native installer is ready for every Mac.
+---
 
-The software is free under FSL-1.1-ALv2. Model, compute and integration bills are separate. There is no guarantee of a particular setup time, total saving or reliability advantage.
+## Slack (beta)
+
+Your bots can answer in Slack under their own names and pictures, through **your own** Slack app.
+One app serves every Better Than GrokBot team on your Mac. They answer in direct messages, in
+threads they started, and in channels only when the app is @mentioned, and they stay out of threads
+that another bot is already answering.
+
+Slack has to reach your Mac, so you need a public https address that forwards only Slack's paths to
+it: the small front door in `edge/`, behind a Cloudflare tunnel.
+
+1. **A public address.** Either:
+   - **A domain on Cloudflare (stays the same):** `brew install cloudflared`, `cloudflared tunnel login`,
+     then `node scripts/front-door.cjs tunnel bops-hooks.<your-domain>` and
+     `node scripts/front-door.cjs enable bops-hooks.<your-domain>`. This runs the front door on
+     127.0.0.1:3290 and the tunnel as login services; only Slack's paths are passed through.
+   - **No domain (to try it; the address changes on every restart):** run the front door,
+     `PORT=3290 HOST=127.0.0.1 BOPS_UPSTREAM=http://127.0.0.1:3210 node edge/server.mjs`, and in another
+     terminal `cloudflared tunnel --url http://127.0.0.1:3290`, which prints a `https://….trycloudflare.com` address.
+2. Save that address: `node scripts/set-key.cjs BOPS_PUBLIC_URL` (like `https://bops-hooks.example.com`,
+   no trailing slash), and restart the app.
+3. Print your app's manifest: `node slack/setup.mjs manifest --no-events`.
+4. At **api.slack.com/apps → Create New App → From a manifest**, choose your workspace and paste it.
+   Then **Install to Workspace** and allow it (the user does this; it's their workspace).
+5. In Better Than GrokBot, open a bot's profile → **Where to find** → **Slack**, and paste the app's
+   **Bot User OAuth Token** (`xoxb-…`) and **Signing Secret** (Basic Information).
+6. Back in the Slack app's **Event Subscriptions**: turn events on, set the request URL to
+   `<your address>/hooks/slack` (it should show Verified), and add the bot events
+   `message.im`, `message.channels`, `message.groups`, `message.mpim` and `app_mention`. Save, and
+   reinstall if Slack asks.
+7. DM the bot, or invite it to a channel and @mention it.
+
+To stop: `node scripts/front-door.cjs disable` (or stop the two commands from step 1). To disconnect
+Slack from one team, remove it under **Where to find → Slack**.
+
+## Streaming (beta)
+
+Replies stream into the chat as they're written, and tool steps show as they run. Nothing to set up.
+
+---
+
+The software is free under FSL-1.1-ALv2 (see LICENSE). Model, computer and integration providers bill
+you separately. Setup time, cost and reliability depend on your accounts and providers.
