@@ -9,8 +9,9 @@ about your agents: bring your own charters, get help writing them, or start with
 (a lead plus a Head of Operations) and grow from there. It starts as a blank canvas: no agents,
 data or accounts but yours.
 
-You need a Mac (Apple silicon for the optional native app), Node.js 24 or newer, Git, and an
-OpenRouter or OpenAI API key. Everything else is optional and can be added later.
+You need a Mac (Apple silicon for the optional native app), Node.js 24 or newer, Git, an
+OpenRouter or OpenAI API key, and an Orgo API key (orgo.ai, for the bots' computers; a self-hosted
+install opens only with one). Everything else is optional and can be added later.
 
 ---
 
@@ -52,7 +53,7 @@ way (restart the app to load it).
 |---|---|---|---|
 | `OPENROUTER_API_KEY` | The bots' thinking (chat and tasks), any model on OpenRouter | openrouter.ai → Keys | One of these two is **required** |
 | `OPENAI_API_KEY` | Same, through OpenAI directly; also live voice calls | platform.openai.com → API keys | (see above) |
-| `ORGO_API_KEY` | Each bot's own cloud computer (browser, desktop, four screens) | orgo.ai → API keys | Recommended |
+| `ORGO_API_KEY` | Each bot's own cloud computer (browser, desktop, four screens). Without it the app shows "Sign in with Orgo" instead of opening | orgo.ai → API keys | **Required** |
 | `COMPOSIO_API_KEY` | Gmail, Calendar, Slack, Notion, HubSpot and ~1,000 more apps | composio.dev → API keys | Optional |
 | `HONCHO_API_KEY` | Long-term memory across conversations | honcho.dev | Optional |
 | `AGENTMAIL_API_KEY` | An email inbox for every bot | agentmail.to | Optional |
@@ -70,7 +71,8 @@ npm run build
 npx next start --port 3210 --hostname 127.0.0.1
 ```
 
-Run the server in the background and keep it running. If port 3210 is taken, check what is there
+Run the server in the background and keep it running. Next prints a warning that `next start`
+doesn't suit `output: standalone`; it is expected here and the app runs normally. If port 3210 is taken, check what is there
 (`curl -s http://127.0.0.1:3210/api/health`) before starting a second copy. When
 `curl -s http://127.0.0.1:3210/api/health` answers `{"bops":true,…}`, open http://localhost:3210
 for the user. For development, `npm run dev -- --port 3210` works too.
@@ -117,8 +119,8 @@ List the team to confirm: `curl -s http://127.0.0.1:3210/api/state | node -e "le
 ### 7. First check
 
 With the user's permission (it uses their model provider), send a short message to the lead in the
-app and confirm a reply comes back. If `ORGO_API_KEY` is set, ask before running a harmless read-only
-computer task. Report plainly what works and what is still missing.
+app and confirm a reply comes back. Ask before running a harmless read-only
+computer task (the bot's computer starts on first use). Report plainly what works and what is still missing.
 
 ### 8. Optional next steps (only if the user wants them)
 
@@ -131,10 +133,10 @@ computer task. Report plainly what works and what is still missing.
 ## Startup checklist
 
 - [ ] The app opens at http://localhost:3210.
-- [ ] A model provider key is set, and a chat reply comes back.
+- [ ] A model provider key and an Orgo key are set, and a chat reply comes back.
 - [ ] Your name and business are set.
 - [ ] Your agents exist: your charters, or the default lead and Head of Operations.
-- [ ] For cloud computer work: an Orgo key is set and a read-only check passes.
+- [ ] For cloud computer work: a read-only computer check passes.
 - [ ] You know which actions the bots will ask you to approve (sending, posting, paying, deleting).
 
 ---

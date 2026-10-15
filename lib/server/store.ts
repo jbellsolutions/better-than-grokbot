@@ -25,7 +25,7 @@ const seedBots: Bot[] = [
 /** The main bot as on day one: no computer yet (one launches from the Bops template on its first task), nothing connected. */
 const freshMain = (): Bot => instanceId() === "default"
   ? ({ ...seedBots.find((b) => b.isMain)!, computerId: undefined, computerStatus: "none" })
-  : ({ id: "ops", name: instanceName(), role: "Coordinate this business. Keep outreach paused until explicit release.", color: "#0A0A0A", isMain: true, computerId: instanceComputer(), externalComputer: true, computerStatus: "ready", runsOn: "cloud" });
+  : ({ id: "ops", name: instanceName(), role: "Coordinate this team. Follow the owner’s goals and approval requirements.", color: "#0A0A0A", isMain: true, computerId: instanceComputer(), externalComputer: true, computerStatus: "ready", runsOn: "cloud" });
 
 const botChat = (botId: string, at = Date.now()): Chat => ({ id: botChatId(botId), kind: "bot", botIds: [botId], createdAt: at, typing: [] });
 

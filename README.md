@@ -33,7 +33,8 @@ yours. **[INSTALL.md](INSTALL.md)** has the steps, a startup checklist, and Slac
 
 ### By hand
 
-You need Node.js 24 or newer, Git, and an OpenRouter or OpenAI API key.
+You need Node.js 24 or newer, Git, an OpenRouter or OpenAI API key, and an Orgo API key (orgo.ai;
+the bots' computers, and a self-hosted install opens only with one).
 
 ```bash
 git clone https://github.com/jbellsolutions/better-than-grokbot.git
@@ -41,11 +42,12 @@ cd better-than-grokbot
 npm ci
 cp .env.example .env.local && chmod 600 .env.local
 node scripts/set-key.cjs OPENROUTER_API_KEY     # or OPENAI_API_KEY; the value is hidden as you paste
+node scripts/set-key.cjs ORGO_API_KEY
 npm run build
 npx next start --port 3210 --hostname 127.0.0.1
 ```
 
-Open **http://localhost:3210**. Add more keys (Orgo, Composio, Honcho, AgentMail…) the same way and
+Open **http://localhost:3210**. Add more keys (Composio, Honcho, AgentMail…) the same way and
 restart; INSTALL.md says what each one does.
 
 The software is free under **[FSL-1.1-ALv2](LICENSE)**. AI calls, cloud computers, email/phone and
@@ -128,7 +130,7 @@ Everything runs on your Mac except the bots' computers and the providers. `edge/
 ## Requirements
 
 - macOS on Apple Silicon, Node 24 or newer.
-- **Required:** an OpenRouter or OpenAI API key. Cloud computer tasks also require your own Orgo account.
+- **Required:** an OpenRouter or OpenAI API key, and an Orgo API key: self-hosted, the app opens only with one, and the bots' computers run on your Orgo account.
 - **Recommended:** Typesafe (small judgment calls), Honcho (memory), Composio (apps), AgentMail (email), Tailscale (direct live view of the bots' screens).
 - **Optional:** AgentPhone plus a public URL for texts and calls (see `edge/`).
 - **For "Your Mac":** the Codex CLI signed in with ChatGPT (with computer use), and `cua-driver` (default `~/.local/bin/cua-driver`). macOS asks for Screen Recording and Accessibility.
