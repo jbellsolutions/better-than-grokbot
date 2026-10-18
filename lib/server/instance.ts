@@ -10,7 +10,7 @@ export function instanceId() {
 
 export const dataDir = () => resolve(process.env.BOPS_DATA_DIR || join(process.cwd(), ".data"));
 export const dataPath = (...parts: string[]) => join(dataDir(), ...parts);
-export const instanceName = () => process.env.BOPS_INSTANCE_NAME || "Current Bops";
+export const instanceName = () => process.env.BOPS_INSTANCE_NAME || "Better than GrokBot";
 export const instanceComputer = () => process.env.BOPS_ORGO_COMPUTER_ID;
 export const registryPath = () => process.env.BOPS_INSTANCE_REGISTRY || join(process.cwd(), ".data", "instances.json");
 export const keychainService = () => instanceId() === "default" ? "Bops Vault" : `Bops Vault ${instanceId()}`;

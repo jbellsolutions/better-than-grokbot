@@ -331,7 +331,7 @@ export function MacComputer({
       {mode === "panel" && !blocked && followRow && (
         <div className="-mb-1 flex items-center gap-2">
           {following ? (
-            <span className="flex items-center gap-1.5 text-[12px] leading-4 text-[#6B6B6B]" title="Better Than GrokBot shows the window being worked on. Pick one to stay on it.">
+            <span className="flex items-center gap-1.5 text-[12px] leading-4 text-[#6B6B6B]" title="Better than GrokBot shows the window being worked on. Pick one to stay on it.">
               <span className="size-1.5 animate-pulse rounded-full bg-[#2BB673]" />
               {grid.length ? `Watching ${grid.length} windows at once` : "Following the action"}
             </span>
@@ -486,10 +486,10 @@ function Blocked({ why }: { why: "app" | "loading" | "permission" | "nothing" })
   if (why === "loading") return <div className="h-full w-full animate-pulse" />;
   const [title, body] =
     why === "app"
-      ? ["Open the Better Than GrokBot app to watch your Mac", "A browser tab can't see your screen. In the Better Than GrokBot app, your displays and the windows bots use show here live."]
+      ? ["Open the Better than GrokBot app to watch your Mac", "A browser tab can't see your screen. In the Better than GrokBot app, your displays and the windows bots use show here live."]
       : why === "permission"
-        ? ["Let Better Than GrokBot see your screen", "macOS asks once: turn on Better Than GrokBot under Screen Recording, then quit and reopen Better Than GrokBot."]
-        : ["Nothing to show yet", "Better Than GrokBot can't find a display to show."];
+        ? ["Let Better than GrokBot see your screen", "macOS asks once: turn on Better than GrokBot under Screen Recording, then quit and reopen Better than GrokBot."]
+        : ["Nothing to show yet", "Better than GrokBot can't find a display to show."];
   return (
     <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-8 text-center">
       <span className="flex size-11 items-center justify-center rounded-2xl bg-ink text-highlighter">
@@ -597,7 +597,7 @@ function MacWatchSheet({ target, onClose }: { target: { app?: string; title?: st
         </div>
         {!picked ? (
           <>
-            <span className="text-[12.5px] leading-[17px] text-[#6B6B6B]">Pick the window. Better Than GrokBot reads its text when it changes (no screenshots, nothing clicked) and tells you when something needs you.</span>
+            <span className="text-[12.5px] leading-[17px] text-[#6B6B6B]">Pick the window. Better than GrokBot reads its text when it changes (no screenshots, nothing clicked) and tells you when something needs you.</span>
             <div className="flex max-h-[300px] flex-col overflow-y-auto rounded-xl shadow-[0_0_0_1px_#ECECEA]">
               {windows === null ? (
                 <span className="px-3 py-3 text-[12.5px] text-[#9A9A98]">Looking at your windows…</span>

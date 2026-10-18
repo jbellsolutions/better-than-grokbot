@@ -33,7 +33,7 @@ export async function GET(request: Request) {
  * didn't get there, or bring back the screens of one that's ready.
  */
 export async function POST(request: Request) {
-  if (process.env.BOPS_COMPUTER_OBSERVE_ONLY === "1") return Response.json({ error: "Hermes owns this computer; Bops is connected for viewing." }, { status: 409 });
+  if (process.env.BOPS_COMPUTER_OBSERVE_ONLY === "1") return Response.json({ error: "Hermes owns this computer; Better than GrokBot is connected for viewing." }, { status: 409 });
   const { botId } = (await request.json()) as { botId?: string };
   const b = botId ? bot(botId) : undefined;
   if (!b) return Response.json({ error: "no such bot" }, { status: 404 });

@@ -1,3 +1,4 @@
+import { MAIN_AGENT_ROLE, PRODUCT_NAME } from "@/lib/brand";
 import { instanceId, instanceName, instanceComputer } from "./instance";
 import "server-only";
 import { reconcileProfiles } from "./business-profiles";
@@ -15,7 +16,7 @@ import { noteSession } from "./turn-events";
  */
 
 const seedBots: Bot[] = [
-  { id: "boppy", name: "Boppy", role: "Chief of Staff", color: "#0A0A0A", isMain: true, computerStatus: "none" },
+  { id: "boppy", name: PRODUCT_NAME, role: MAIN_AGENT_ROLE, color: "#0A0A0A", isMain: true, computerStatus: "none" },
   { id: "otto", name: "Otto", role: "Outbound", color: "#E9FF3B", isMain: false, computerStatus: "none" },
   { id: "rook", name: "Rook", role: "Recruiting", color: "#47C46B", isMain: false, computerStatus: "none" },
   { id: "iris", name: "Iris", role: "Inbox", color: "#5B8CFF", isMain: false, computerStatus: "none" },

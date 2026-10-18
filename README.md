@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="site/mark.svg" width="96" height="96" alt="Better Than GrokBot">
+  <img src="site/mark.svg" width="96" height="96" alt="Better than GrokBot">
 </p>
 
-<h1 align="center">Better Than GrokBot</h1>
+<h1 align="center">Better than GrokBot</h1>
 
 <p align="center">
   <b>A team of AI bots that runs your business ops.</b><br>
@@ -17,14 +17,14 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/app.png" alt="Bops: Boppy's chat on the left, and its computer on the right building a lead list on four screens at once" width="100%">
+  <img src="docs/images/app.png" alt="Bops: Better than GrokBot's chat on the left, and its computer on the right building a lead list on four screens at once" width="100%">
 </p>
 
 ## Install with Claude Code or Codex
 
 Paste this repository's link into Claude Code or Codex and say:
 
-> **Install Better Than GrokBot on this computer. Follow INSTALL.md.**
+> **Install Better than GrokBot on this computer. Follow INSTALL.md.**
 
 It installs and starts the app, asks for your keys one at a time, then asks about your agents: paste
 your own charters, get help writing them, or start with the default team (a lead and a Head of
@@ -64,14 +64,14 @@ other connected services bill you separately. The license restricts competing co
 
 ## An AI team that gets work done
 
-Better Than GrokBot is an independently maintained, self-hosted Mac app based on Bops. The software is free under the included FSL license; AI and infrastructure providers bill separately.
+Better than GrokBot is an independently maintained, self-hosted Mac app based on Bops. The software is free under the included FSL license; AI and infrastructure providers bill separately.
 
 You chat with your bots like teammates, and they do the work on their own cloud computers: inbox, pipeline, invoices, reports. Text them from your phone, call them and talk live, email them a task, or add them to Slack, Telegram and Discord. Wherever you reach them, they know who you are and what they did yesterday.
 
 <table>
   <tr>
     <td width="50%" valign="top">
-      <img src="docs/images/screen.png" alt="One of Boppy's screens up close, with Watch and Take control">
+      <img src="docs/images/screen.png" alt="One of Better than GrokBot's screens up close, with Watch and Take control">
       <p><b>Its own computer, four screens.</b> A bot works on up to four things at once. Watch any screen live, take control, then hand it back.</p>
     </td>
     <td width="50%" valign="top">
@@ -93,7 +93,7 @@ You chat with your bots like teammates, and they do the work on their own cloud 
 
 ## What it does
 
-- **A team per workspace.** A main bot (Boppy by default) runs the team and hands work to specialists you add. Bots talk to each other, keep threads, and report back in the chat.
+- **A team per workspace.** A main bot (Better than GrokBot by default) runs the team and hands work to specialists you add. Bots talk to each other, keep threads, and report back in the chat.
 - **Each bot has its own computer.** An [Orgo](https://orgo.ai) cloud computer with four screens. You can watch any screen live and take over.
 - **Your Mac, when you say so.** Bots can work in your Mac's apps through Codex computer use, with your rules for which apps they may use.
 - **Long-term memory** (Honcho): what you tell your bots, they remember, per workspace.
@@ -106,7 +106,7 @@ You chat with your bots like teammates, and they do the work on their own cloud 
 
 Coming soon: WhatsApp, and a real phone per bot.
 
-## Get Better Than GrokBot
+## Get Better than GrokBot
 
 - **Upstream Bops (separate product):** [download the Mac app](https://bops.bot/download/Bops.dmg) and sign in with Orgo. Every service is run for you; no keys on your Mac. Free to start, with Pro and Max plans for more AI credit.
 - **Self-hosted:** free under the license. Bring your own keys and run everything yourself: see below.
@@ -116,7 +116,7 @@ Requires macOS on Apple silicon.
 ## How it works
 
 ```
-Better Than GrokBot.app (Electron) ── loads ──► coordinator (Next.js, port 3210, on your Mac)
+Better than GrokBot.app (Electron) ── loads ──► coordinator (Next.js, port 3210, on your Mac)
                                    ├─ chat, threads, routines, watches (state in .data/)
                                    ├─ OpenAI: chat, agent runs, GPT-Live calls
                                    ├─ Orgo: bots' computers (CDP and screens over Tailscale, or Orgo's API)
@@ -137,7 +137,7 @@ Everything runs on your Mac except the bots' computers and the providers. `edge/
 
 ## Self-host it
 
-This fork is named **Better Than GrokBot**. Its settings keep Bops' names (`BOPS_*`, the `ai.orgo.bops.selfhosted` bundle and service IDs, `~/Library/Application Support/Bops Self-Hosted`), so state and credentials from a Bops install carry over.
+This fork is named **Better than GrokBot**. Its settings keep Bops' names (`BOPS_*`, the `ai.orgo.bops.selfhosted` bundle and service IDs, `~/Library/Application Support/Bops Self-Hosted`), so state and credentials from a Bops install carry over.
 
 
 ```bash
@@ -214,7 +214,7 @@ npm run app:install
 ```
 
 The installer checks for active tasks, stops the service while building, restores it even if the build
-fails, and replaces only `Better Than GrokBot.app`. The original `Bops.app` is preserved. To disable the
+fails, and replaces only `Better than GrokBot.app`. The original `Bops.app` is preserved. To disable the
 always-on setup, boot out the service, remove its LaunchAgent plist and `.data/service.json`, and
 disable only Bops' Serve port with `tailscale serve --https=8443 off`.
 
@@ -236,7 +236,7 @@ US texting needs an A2P 10DLC registration for your brand.
 scripts/release.sh          # or: npm run app:release
 ```
 
-It fetches the `orgo-relay` agent (`scripts/fetch-relay.sh`, into `vendor/orgo-relay/`), builds the server (`next build`, `output: "standalone"`), and makes `dist-desktop/Better Than GrokBot-<version>-arm64.dmg` and `.zip` (Apple silicon). The app carries the server in `Contents/Resources/server` and runs it with its own Node (no Node or source folder needed on the user's Mac); its state lives in `~/Library/Application Support/Bops/server/.data` and its log in `~/Library/Logs/Bops/server.log`. The relay agent ships as `Contents/Resources/bin/orgo-relay`. No `.env` file goes into the app; settings for one Mac can go in `~/Library/Application Support/Bops/.env.local`. Before finishing, the script starts the bundled server once as a fresh install would, with no keys and an empty home folder (port 3299), and checks that the page and the app's state answer. The bundled server listens on 127.0.0.1 only: bot computers' app calls and phone webhooks, which come over the tailnet, don't reach it unless that `.env.local` says `BOPS_LISTEN_ALL=1` (then `proxy.ts` lets other addresses reach only those paths). While it's loopback only, Orgo threads get no app tools.
+It fetches the `orgo-relay` agent (`scripts/fetch-relay.sh`, into `vendor/orgo-relay/`), builds the server (`next build`, `output: "standalone"`), and makes `dist-desktop/Better than GrokBot-<version>-arm64.dmg` and `.zip` (Apple silicon). The app carries the server in `Contents/Resources/server` and runs it with its own Node (no Node or source folder needed on the user's Mac); its state lives in `~/Library/Application Support/Bops/server/.data` and its log in `~/Library/Logs/Bops/server.log`. The relay agent ships as `Contents/Resources/bin/orgo-relay`. No `.env` file goes into the app; settings for one Mac can go in `~/Library/Application Support/Bops/.env.local`. Before finishing, the script starts the bundled server once as a fresh install would, with no keys and an empty home folder (port 3299), and checks that the page and the app's state answer. The bundled server listens on 127.0.0.1 only: bot computers' app calls and phone webhooks, which come over the tailnet, don't reach it unless that `.env.local` says `BOPS_LISTEN_ALL=1` (then `proxy.ts` lets other addresses reach only those paths). While it's loopback only, Orgo threads get no app tools.
 
 What a release needs:
 
@@ -249,7 +249,7 @@ The app is signed with the hardened runtime and only two entitlements (`build/en
 
 Why not the Mac App Store: its sandbox would stop Bops from running its own server and the relay, starting Codex and Chrome for the bots, and driving other apps for computer use.
 
-`npm run app:build` (and `app:install`) make a source-linked **Better Than GrokBot** app that uses
+`npm run app:build` (and `app:install`) make a source-linked **Better than GrokBot** app that uses
 production `next start` from this folder, unsigned (`-c.mac.identity=null`, so electron-builder doesn't pick whatever Apple Development certificate is in the keychain). The release script pins signing to the Developer ID certificate and fails if anything else signed the app.
 
 ## Project layout
@@ -301,7 +301,7 @@ Orgo root environment with Chrome, Node, npm, and at least 2 GB free. Existing s
 installed. Multiple agents assigned to the same VM share one screen ledger. Borrowed VMs keep
 their network identity; live preview falls back to Orgo screenshots unless a Bops tailnet path exists.
 
-macOS grants permissions separately to **Better Than GrokBot**, the downloaded **Bops** app,
+macOS grants permissions separately to **Better than GrokBot**, the downloaded **Bops** app,
 and **Codex Computer Use**. Enable Screen Recording for the self-hosted app to show live Mac
 previews. Mac automation through Codex needs the Codex Computer Use helper’s own Accessibility
 and Screen Recording grants. Restart the affected app after granting Screen Recording.
@@ -355,7 +355,7 @@ On a replacement Apple-silicon Mac:
    `openrouter/` and `models.json` (if present) into `.data/`. Keep them private. Do **not** restore `deployment/service.json`
    yet; the deployment plists are references and contain paths from the previous Mac.
 3. Run `npm ci`, then `npm run app:build`, then `npm run service:enable`.
-   Copy `dist-desktop/mac-arm64/Better Than GrokBot.app` into `/Applications/` with `ditto`, then open it.
+   Copy `dist-desktop/mac-arm64/Better than GrokBot.app` into `/Applications/` with `ditto`, then open it.
 4. Sign into Orgo and Codex again as required. Authentication tokens/Keychain items are not exported.
    Approve macOS permissions for the self-hosted app and Codex helper.
 5. Configure Tailscale Serve on port 8443, update `BOPS_PUBLIC_HOST` and `BOPS_TAILSCALE_USER` for
@@ -386,7 +386,7 @@ separate configuration/security decision. Do not share the owner's login or bypa
 
 ### Agent communication and model configuration
 
-Bots in the same Bops workspace can use `ask_teammate`; Boppy also has `hand_off` for task delegation.
+Bots in the same Bops workspace can use `ask_teammate`; Better than GrokBot also has `hand_off` for task delegation.
 The coordinator stores their conversations and routes requests across computers. Sharing an Orgo
 computer alone does not establish communication, and this is Bops' internal messaging rather than
 a published standard A2A network endpoint. OpenRouter chat/cloud inference runs through the Mac's

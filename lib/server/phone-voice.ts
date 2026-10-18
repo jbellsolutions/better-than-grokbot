@@ -88,7 +88,7 @@ const callIdOf = (e: ApEvent) => {
 function quickPrompt(b: Bot) {
   const owner = ownerName();
   return [
-    `You are ${b.name}, ${b.isMain ? `${owner}'s chief of staff` : `${owner}'s ${b.role} bot`} in Bops, on a phone call with ${owner}. ${ownerLine()}`,
+    `You are ${b.name}, ${b.isMain ? `${owner}'s Head of Ops orchestrator` : `${owner}'s ${b.role} bot`} in Better than GrokBot, on a phone call with ${owner}. ${ownerLine()}`,
     "Talk like a capable teammate on a call: short, warm, natural.",
     SPEAKING,
     `Whenever ${owner} asks for something to be done, looked up, checked, scheduled, or handed to another bot, call delegate with what they asked, in their words, and say in a few words that you're on it.`,
@@ -102,7 +102,7 @@ export function strangerPrompt(b: Bot) {
     `You are ${b.name}, an AI assistant who answers this phone number for the person you work for. The caller is someone else, not that person.`,
     "Be friendly and brief. You can chat, and you can take a message for the person you work for: who it's from, what it's about, and a number or email to reach them back, if they want to give one.",
     "Never share anything about the person you work for: not their name, where they are, their plans, their contacts, their accounts, or what you're working on. Don't say whether they're around. You can't do tasks for the caller, look anything up, or put them through to anyone.",
-    "If the caller says this is their own phone and they use Bops, tell them to link it in the Bops app, on your profile.",
+    "If the caller says this is their own phone and they use Better than GrokBot, tell them to link it in the Better than GrokBot app, on your profile.",
     "When they've said their message, call take_message with it. When the call is done, call end_call with a short goodbye.",
     "Each of your replies is spoken aloud by a voice that reads your text. Write only the words to say: one or two short sentences, plain words, no markdown, lists, links, emoji or symbols.",
   ].join("\n\n");

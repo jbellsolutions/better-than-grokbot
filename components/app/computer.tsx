@@ -722,7 +722,7 @@ function ManagedComputerView({
       {mode === "panel" && (working.length > 1 || (follow && !follow.on)) && (
         <div className="-mb-1 flex items-center gap-2">
           {follow?.on ? (
-            <span className="flex items-center gap-1.5 text-[12px] leading-4 text-[#6B6B6B]" title="Better Than GrokBot shows the screens being worked on. Pick one to stay on it.">
+            <span className="flex items-center gap-1.5 text-[12px] leading-4 text-[#6B6B6B]" title="Better than GrokBot shows the screens being worked on. Pick one to stay on it.">
               <span className="size-1.5 animate-pulse rounded-full" style={{ background: botBezel(b) }} />
               {grid ? `Watching ${working.length} things at once` : "Following the action"}
             </span>
@@ -1059,7 +1059,7 @@ function NoComputer({ state, bot: b, host }: { state: AppState; bot: Bot; /** Th
       <Mascot botId={b.id} color={b.color} size={44} />
       <span className="max-w-[300px] text-[14px] leading-5">
         {b.isMain
-          ? `${b.name} doesn't have a computer yet. ${free ? `Your free Better Than GrokBot computer starts the first time ${b.name} needs it` : `It starts the first time ${b.name} needs one`}, or set it up now. The bots you add work on it too, unless you give one its own.`
+          ? `${b.name} doesn't have a computer yet. ${free ? `Your free Better than GrokBot computer starts the first time ${b.name} needs it` : `It starts the first time ${b.name} needs one`}, or set it up now. The bots you add work on it too, unless you give one its own.`
           : host.id !== b.id
             ? `${b.name} works on ${host.name}'s computer, which isn't set up yet. It starts the first time either of them needs it.`
             : `${b.name} doesn't have a computer yet. It gets a copy of the main bot's computer: apps, logins and open screens.`}

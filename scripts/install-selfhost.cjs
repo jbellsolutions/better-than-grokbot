@@ -21,7 +21,7 @@ async function main() {
     const response = await fetch('http://127.0.0.1:3210/api/state', { signal: AbortSignal.timeout(5000) });
     if (!response.ok) throw Error('Could not verify whether tasks are active.');
     const { state } = await response.json();
-    if (state.sessions.some(s => ['starting', 'running', 'queued'].includes(s.status) || !!s.hermesHelpId || !!s.codexTurn || !!s.macPending) || state.chats.some(c => c.typing?.length)) throw Error('Wait until all Better Than GrokBot tasks and chat replies finish before rebuilding.');
+    if (state.sessions.some(s => ['starting', 'running', 'queued'].includes(s.status) || !!s.hermesHelpId || !!s.codexTurn || !!s.macPending) || state.chats.some(c => c.typing?.length)) throw Error('Wait until all Better than GrokBot tasks and chat replies finish before rebuilding.');
   } catch (e) {
     if (e.message?.startsWith('Wait until') || e.message?.startsWith('Could not verify')) throw e;
     if (managed) throw Error('The managed service is unavailable. Recover it before installing.');
@@ -58,15 +58,15 @@ async function main() {
     else console.error(`Build recovery preserved: ${rollbackDirectory}`);
     for (const service of stoppedServices) run('/bin/launchctl', ['bootstrap', `gui/${process.getuid()}`, service.plist]);
   }
-  const target = '/Applications/Better Than GrokBot.app';
+  const target = '/Applications/Better than GrokBot.app';
   if (fs.existsSync(target)) {
     const id = run('/usr/libexec/PlistBuddy', ['-c', 'Print :CFBundleIdentifier', path.join(target, 'Contents/Info.plist')], { stdio: 'pipe' }).toString().trim();
     if (id !== 'ai.orgo.bops.selfhosted') throw Error('The install target is not the self-hosted app.');
-    run('/usr/bin/osascript', ['-e', 'tell application "Better Than GrokBot" to quit']);
+    run('/usr/bin/osascript', ['-e', 'tell application "Better than GrokBot" to quit']);
   }
   const staged = `/Applications/.Better-Than-GrokBot-${process.pid}.app`;
   const previous = `/Applications/.Better-Than-GrokBot-previous-${process.pid}.app`;
-  run('/usr/bin/ditto', [path.join(root, 'dist-desktop/mac-arm64/Better Than GrokBot.app'), staged]);
+  run('/usr/bin/ditto', [path.join(root, 'dist-desktop/mac-arm64/Better than GrokBot.app'), staged]);
   const existed = fs.existsSync(target);
   try {
     if (existed) fs.renameSync(target, previous);
@@ -80,6 +80,6 @@ async function main() {
     catch (e) { console.warn(`Updated app installed; previous bundle kept at ${previous}: ${e.message}`); }
   }
   run('/usr/bin/open', [target]);
-  console.log('Better Than GrokBot installed. The original Bops.app is preserved.');
+  console.log('Better than GrokBot installed. The original Bops.app is preserved.');
 }
 main().catch(e => { console.error(e.message); process.exitCode = 1; });

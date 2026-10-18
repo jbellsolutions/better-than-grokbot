@@ -1,4 +1,4 @@
-If the user asks you to install or set up Better Than GrokBot, follow INSTALL.md and its startup checklist. Do not claim setup is complete until its required checks pass.
+If the user asks you to install or set up Better than GrokBot, follow INSTALL.md and its startup checklist. Do not claim setup is complete until its required checks pass.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

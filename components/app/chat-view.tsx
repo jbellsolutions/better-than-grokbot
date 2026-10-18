@@ -1194,7 +1194,7 @@ function PairSheet({ state, pairId, focusId, onClose }: { state: AppState; pairI
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
-  const label = (b: Bot) => `${b.name} · ${b.isMain ? "Chief of Staff" : b.role}`;
+  const label = (b: Bot) => `${b.name} · ${b.isMain ? "Head of Ops · Orchestrator" : b.role}`;
   return (
     <div className="absolute inset-0 z-40 flex animate-[screen-in_200ms_ease-out] flex-col bg-white">
       <div className="flex shrink-0 justify-center px-5 pb-2 pt-4">

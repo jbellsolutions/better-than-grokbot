@@ -137,7 +137,7 @@ function Bops({ state }: { state: AppState | null }) {
     if (!state) return;
     const due = [
       ...(state.watches ?? []).filter((w) => w.alert?.level === "now").map((w) => ({ key: `w:${w.id}:${w.alert!.at}`, title: w.mac?.title ?? w.site, body: w.alert!.text })),
-      ...state.messages.filter((m) => m.ping).map((m) => ({ key: `m:${m.id}`, title: state.bots.find((b) => b.id === m.botId)?.name ?? "Better Than GrokBot", body: m.text.replace(/\*\*|\[|\]\([^)]*\)/g, "").slice(0, 140) })),
+      ...state.messages.filter((m) => m.ping).map((m) => ({ key: `m:${m.id}`, title: state.bots.find((b) => b.id === m.botId)?.name ?? "Better than GrokBot", body: m.text.replace(/\*\*|\[|\]\([^)]*\)/g, "").slice(0, 140) })),
     ];
     if (!pinged.current) {
       pinged.current = new Set(due.map((d) => d.key));
@@ -212,7 +212,7 @@ function Bops({ state }: { state: AppState | null }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [setThreadId]);
 
-  if (!state) return <div className="flex h-screen items-center justify-center text-pencil">Loading Better Than GrokBot…</div>;
+  if (!state) return <div className="flex h-screen items-center justify-center text-pencil">Loading Better than GrokBot…</div>;
 
   // Stay inside the workspace you're in: a chat from another one falls back to this one's main bot.
   const team = teamOf(state);
@@ -778,7 +778,7 @@ function ReachSettings() {
       : texting
         ? "Text or call your bots, and they reach you back. They know it's you from the numbers listed here."
         : "Email your bots, and they reach you back. They know it's you from the emails listed here.";
-  const unreachable = "Couldn't reach Better Than GrokBot.";
+  const unreachable = "Couldn't reach Better than GrokBot.";
   return (
     <div className="flex flex-col gap-2 px-[22px] pt-4">
       <div className="flex flex-col gap-0.5">
@@ -821,7 +821,7 @@ function PhoneService() {
           {info.texting === "none" ? " (carriers approve business texting first (A2P 10DLC), about 7–10 business days)" : ""}
         </span>
         <span>
-          <span className="text-[#9A9A98]">Calls to the bots&apos; numbers:</span> {info.calls === "agent" ? "on (each number's agent passes every turn to Better Than GrokBot)" : (info.calls ?? "unknown")}
+          <span className="text-[#9A9A98]">Calls to the bots&apos; numbers:</span> {info.calls === "agent" ? "on (each number's agent passes every turn to Better than GrokBot)" : (info.calls ?? "unknown")}
         </span>
         {info.workspaces?.map((w) => (
           <span key={w.id}>

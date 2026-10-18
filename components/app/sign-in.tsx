@@ -177,7 +177,7 @@ function Heading({ title, line }: { title: string; line: string }) {
 const PROBLEMS: Record<Problem, { title: string; line: string; action: string }> = {
   offline: { title: "Couldn't reach Orgo", line: "Check your internet connection, then try again.", action: "Try again" },
   orgo: { title: "Orgo had a problem", line: "Something went wrong on Orgo's side. Try again in a moment.", action: "Try again" },
-  keychain: { title: "Couldn't save your sign-in", line: "Your Mac didn't let Better Than GrokBot keep it in the keychain. Unlock your Mac, then try again.", action: "Try again" },
+  keychain: { title: "Couldn't save your sign-in", line: "Your Mac didn't let Better than GrokBot keep it in the keychain. Unlock your Mac, then try again.", action: "Try again" },
 };
 
 /** The first screen, and where expired, declined and failed attempts come back to. */
@@ -189,7 +189,7 @@ function Ask({ step, onStart }: { step: Step; onStart: () => void }) {
         ? { title: "Sign-in was declined", line: "This Mac wasn't approved. If that was a mistake, start again.", action: "Try again" }
         : step.kind === "problem"
           ? PROBLEMS[step.problem]
-          : { title: "Welcome to Better Than GrokBot", line: "Sign in with your Orgo account. Your bots and their computers live there.", action: "Sign in with Orgo" };
+          : { title: "Welcome to Better than GrokBot", line: "Sign in with your Orgo account. Your bots and their computers live there.", action: "Sign in with Orgo" };
   return (
     <>
       <Heading title={copy.title} line={copy.line} />
@@ -266,7 +266,7 @@ function Approved({ who }: { who: string }) {
         </svg>
         You&apos;re in
       </span>
-      <span className="text-[13.5px] leading-[19px] text-pencil">{who ? `Signed in as ${who}. Opening Better Than GrokBot.` : "Opening Better Than GrokBot."}</span>
+      <span className="text-[13.5px] leading-[19px] text-pencil">{who ? `Signed in as ${who}. Opening Better than GrokBot.` : "Opening Better than GrokBot."}</span>
     </div>
   );
 }

@@ -145,7 +145,7 @@ async function startServer() {
   for (let i = 0; i < 240 && !(await serverUp()); i++) await new Promise((r) => setTimeout(r, 500));
 }
 
-const splash = `data:text/html,${encodeURIComponent(`<body style="margin:0;height:100vh;display:flex;align-items:center;justify-content:center;font:13px -apple-system,system-ui;color:#6B6B6B;-webkit-app-region:drag">Starting Better Than GrokBot…</body>`)}`;
+const splash = `data:text/html,${encodeURIComponent(`<body style="margin:0;height:100vh;display:flex;align-items:center;justify-content:center;font:13px -apple-system,system-ui;color:#6B6B6B;-webkit-app-region:drag">Starting Better than GrokBot…</body>`)}`;
 
 async function createWindow(instanceId = "default") {
   const entry = readRegistry(REPO).find(e => e.id === instanceId);
@@ -155,7 +155,7 @@ async function createWindow(instanceId = "default") {
     height: 860,
     minWidth: 1180,
     minHeight: 640,
-    title: entry.id === "default" ? "Better Than GrokBot" : entry.name,
+    title: entry.id === "default" ? "Better than GrokBot" : entry.name,
     titleBarStyle: "hiddenInset",
     trafficLightPosition: { x: 14, y: 14 },
     backgroundColor: "#FFFFFF",
@@ -179,7 +179,7 @@ async function createWindow(instanceId = "default") {
     if (entry.id === "default") await startServer();
     else await verify(entry);
   } catch (e) {
-    dialog.showErrorBox("Better Than GrokBot could not start", e.message);
+    dialog.showErrorBox("Better than GrokBot could not start", e.message);
     if (entry.id === "default") app.quit();
     else win.close();
     return;
@@ -296,7 +296,7 @@ function askNotify() {
       }
       resolve(status);
     };
-    const n = new Notification({ title: "Better Than GrokBot", body: "Your bots can tell you when something needs you.", silent: true });
+    const n = new Notification({ title: "Better than GrokBot", body: "Your bots can tell you when something needs you.", silent: true });
     n.once("show", () => done("granted"));
     n.once("failed", () => done("denied"));
     const timer = setTimeout(() => done(notifyKnown() ?? "not-determined"), 30_000);
@@ -377,7 +377,7 @@ ipcMain.handle("mac-show-main", () => {
 });
 
 // Preserve the bundle product name: macOS grants belong to this app, not the hosted Bops app.
-app.setName("Better Than GrokBot");
+app.setName("Better than GrokBot");
 app.setPath("userData", path.join(app.getPath("appData"), "Bops Self-Hosted"));
 
 // Each instance retains its own window, pending requests, conversations and browser session.

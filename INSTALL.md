@@ -1,8 +1,8 @@
-# Install Better Than GrokBot with Claude Code or Codex
+# Install Better than GrokBot with Claude Code or Codex
 
 Paste this repository's link into Claude Code or Codex and say:
 
-> **Install Better Than GrokBot on this computer. Follow INSTALL.md.**
+> **Install Better than GrokBot on this computer. Follow INSTALL.md.**
 
 Your coding agent installs and starts the app, asks you for your keys one at a time, and then asks
 about your agents: bring your own charters, get help writing them, or start with the default team
@@ -110,7 +110,7 @@ Ask:
   they want off their plate, and which jobs that makes (a writer, a researcher, a bookkeeper…). For
   each job, draft a charter (job, tools, what it may do alone, what needs their OK), show it, revise
   it until they approve, then create the agent as above.
-- **They want to start simple:** do nothing. Every new team already has a lead (Boppy) and a Head of
+- **They want to start simple:** do nothing. Every new team already has a lead (Better than GrokBot) and a Head of
   Operations (Bapi), who can create and remove specialists as the work needs them. Tell the user they
   can ask Bapi in the chat for any agent they want.
 
@@ -144,7 +144,7 @@ computer task (the bot's computer starts on first use). Report plainly what work
 ## Slack (beta)
 
 Your bots can answer in Slack under their own names and pictures, through **your own** Slack app.
-One app serves every Better Than GrokBot team on your Mac. They answer in direct messages, in
+One app serves every Better than GrokBot team on your Mac. They answer in direct messages, in
 threads they started, and in channels only when the app is @mentioned, and they stay out of threads
 that another bot is already answering.
 
@@ -164,7 +164,7 @@ it: the small front door in `edge/`, behind a Cloudflare tunnel.
 3. Print your app's manifest: `node slack/setup.mjs manifest --no-events`.
 4. At **api.slack.com/apps → Create New App → From a manifest**, choose your workspace and paste it.
    Then **Install to Workspace** and allow it (the user does this; it's their workspace).
-5. In Better Than GrokBot, open a bot's profile → **Where to find** → **Slack**, and paste the app's
+5. In Better than GrokBot, open a bot's profile → **Where to find** → **Slack**, and paste the app's
    **Bot User OAuth Token** (`xoxb-…`) and **Signing Secret** (Basic Information).
 6. Back in the Slack app's **Event Subscriptions**: turn events on, set the request URL to
    `<your address>/hooks/slack` (it should show Verified), and add the bot events

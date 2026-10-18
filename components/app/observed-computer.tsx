@@ -33,6 +33,6 @@ export function ObservedComputer({ botId, name, hidden }: { botId: string; name:
         // eslint-disable-next-line @next/next/no-img-element
         <img alt={`${name} computer`} className="max-h-full max-w-full object-contain" src={`/api/screen?bot=${encodeURIComponent(botId)}&screen=${encodeURIComponent(screen)}&t=${tick}`} onError={() => setError("Could not load this computer's screen. Retrying shortly.")} /> : <p className="text-sm text-[#6B6B6B]">Connecting to the computer…</p>}
     </div>
-    <p className="mt-3 text-xs leading-5 text-[#6B6B6B]">Hermes currently owns this desktop. Bops keeps this instance’s profiles and conversations separate without changing the existing runtime.</p>
+    <p className="mt-3 text-xs leading-5 text-[#6B6B6B]">Hermes currently owns this desktop. Better than GrokBot keeps this instance’s profiles and conversations separate without changing the existing runtime.</p>
   </div>;
 }

@@ -15,7 +15,7 @@ import { getState, resetState, update } from "@/lib/server/store";
  * user's own on Orgo and may hold computers they put there themselves; those stay, listed in `kept`.
  */
 export async function POST() {
-  stopAllSessions("Stopped: Bops was reset");
+  stopAllSessions("Stopped: Better than GrokBot was reset");
   update((state) => (state.takeover = undefined));
   const borrowed = new Set(getState().bots.filter(b => b.externalComputer || b.computerId === process.env.BOPS_ORGO_COMPUTER_ID).map(b => b.computerId));
   const ours = new Set(getState().bots.flatMap((b) => (b.computerId ? [b.computerId] : [])));

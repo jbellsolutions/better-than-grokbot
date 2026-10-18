@@ -17,7 +17,7 @@ export async function GET() {
  * Each looks at the Mac again; the card follows state.mac.
  */
 export async function POST(request: Request) {
-  if (!fromThisMac(request)) return Response.json({ ok: false, error: "This works in the Bops app on your Mac." }, { status: 403 });
+  if (!fromThisMac(request)) return Response.json({ ok: false, error: "This works in the Better than GrokBot app on your Mac." }, { status: 403 });
   const { action } = (await request.json().catch(() => ({}))) as { action?: unknown };
   try {
     if (action === "install") await retryCodex();

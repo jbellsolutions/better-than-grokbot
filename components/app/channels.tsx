@@ -127,7 +127,7 @@ function TokenSetup({ bot: b, kind }: { bot: Bot; kind: "telegram" | "discord" }
           <>
             Under <b>Bot</b>: turn on <b>Message Content Intent</b>, then <b>Reset Token</b>.
           </>,
-          <>Paste the token. Better Than GrokBot then gives you the link to add it to your server.</>,
+          <>Paste the token. Better than GrokBot then gives you the link to add it to your server.</>,
         ];
   return (
     <div className={card}>
@@ -183,7 +183,7 @@ function SlackAppForm() {
   return (
     <div className="flex flex-col gap-2 border-t border-[#EFEFED] pt-2.5">
       <span className="text-[12.5px] leading-[18px] text-[#3A3A38]">
-        Or your own Slack app, made from Bops&apos; manifest: paste its Bot User OAuth Token and Signing Secret. With it, bots show their work as they go and approvals have buttons. Every Bops on this Mac uses the same app.
+        Or your own Slack app, made from the upstream Bops manifest: paste its Bot User OAuth Token and Signing Secret. With it, bots show their work as they go and approvals have buttons. Every Better than GrokBot instance on this Mac uses the same app.
       </span>
       <input type="password" autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} placeholder="Bot token (xoxb-…)" className={field} />
       <input type="password" autoComplete="off" value={secret} onChange={(e) => setSecret(e.target.value)} placeholder="Signing secret" className={field} />
@@ -208,7 +208,7 @@ function SlackSetup({ state, bot: b }: { state: AppState; bot: Bot }) {
     return (
       <div className={card}>
         <span className="text-[12.5px] leading-[18px] text-[#3A3A38]">
-          Add Better Than GrokBot to your Slack workspace once (Slack asks you to allow it). Then pick the channels {b.name} joins; your other bots join through the same app.
+          Add Better than GrokBot to your Slack workspace once (Slack asks you to allow it). Then pick the channels {b.name} joins; your other bots join through the same app.
         </span>
         <div className="flex items-center gap-2">
           {waiting?.status === "waiting" ? (
@@ -332,7 +332,7 @@ function Linked({ bot: b, link: l }: { bot: Bot; link: ChannelLink }) {
     </>
   ) : (
     <span className="text-[12.5px] leading-[18px] text-[#3A3A38]">
-      Send {l.kind === "slack" ? "the Better Than GrokBot app a direct message" : `${l.handle} a direct message (or mention it in a channel)`} with just the code <Code>{l.pairCode}</Code>
+      Send {l.kind === "slack" ? "the Better than GrokBot app a direct message" : `${l.handle} a direct message (or mention it in a channel)`} with just the code <Code>{l.pairCode}</Code>
     </span>
   );
   return (

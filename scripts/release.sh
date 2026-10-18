@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds Better Than GrokBot.app for release: the orgo-relay agent, the production server (Next standalone) and
+# Builds Better than GrokBot.app for release: the orgo-relay agent, the production server (Next standalone) and
 # the signed, notarized DMG + zip in dist-desktop/. See "Releasing the Mac app" in README.md.
 #
 # Signing uses a "Developer ID Application" certificate: from the keychain, or CSC_LINK (a .p12,
@@ -88,7 +88,7 @@ fi
 # node_modules folder, so package.json copies .next/standalone/node_modules on its own).
 npx electron-builder --mac "$@"
 
-app="$root/dist-desktop/mac-arm64/Better Than GrokBot.app"
+app="$root/dist-desktop/mac-arm64/Better than GrokBot.app"
 
 # 5. Smoke test: the bundled server starts with the app's own Node and serves the app and its state
 # without a missing file. It runs as a fresh install does: no keys (env -i drops this shell's), an
@@ -98,7 +98,7 @@ smoke="$(mktemp -d)"
 for f in "$app/Contents/Resources/server/"* "$app/Contents/Resources/server/.next"; do ln -s "$f" "$smoke/"; done
 (cd "$smoke" && exec env -i HOME="$smoke" PATH=/usr/bin:/bin:/usr/sbin:/sbin ELECTRON_RUN_AS_NODE=1 NODE_ENV=production \
   PORT=3299 HOSTNAME=127.0.0.1 BOPS_SERVER_JS="$app/Contents/Resources/server/server.js" \
-  "$app/Contents/MacOS/Better Than GrokBot" -e "process.chdir = () => {}; require(process.env.BOPS_SERVER_JS)" > "$smoke/server.log" 2>&1) &
+  "$app/Contents/MacOS/Better than GrokBot" -e "process.chdir = () => {}; require(process.env.BOPS_SERVER_JS)" > "$smoke/server.log" 2>&1) &
 smoke_pid=$!
 ok=""
 for _ in $(seq 1 60); do
@@ -129,7 +129,7 @@ if [[ "$signature" == *"Authority=Developer ID Application"* ]]; then
   codesign --verify --deep --strict "$app" && echo "Signature OK."
   spctl -a -vv -t exec "$app" 2>&1 || echo "Gatekeeper doesn't accept it yet (not notarized?)." >&2
 elif [ -n "$signing" ]; then
-  echo "Better Than GrokBot.app isn't signed with a Developer ID Application certificate:" >&2
+  echo "Better than GrokBot.app isn't signed with a Developer ID Application certificate:" >&2
   grep Authority <<<"$signature" >&2 || echo "  (not signed)" >&2
   exit 1
 fi

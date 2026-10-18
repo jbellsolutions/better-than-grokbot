@@ -52,7 +52,7 @@ export function ManageAgents({ team, computerId }: { team: Bot[]; computerId?: s
           <p className="mt-2 text-sm text-[#6B6B6B]">Their chats, threads, routines, tools and inboxes will be deleted. This cannot be undone.</p>
           <ul className="my-3 overflow-y-auto text-sm">{targets.map(b => <li key={b.id} className="py-1">{b.name}</li>)}</ul>
           {ownedComputers.length > 0
-            ? <p className="mb-3 text-sm text-[#B42318]">Their Bops-created computers and files will also be deleted: {ownedComputers.map(b => b.name).join(", ")}.</p>
+            ? <p className="mb-3 text-sm text-[#B42318]">Their Better than GrokBot-created computers and files will also be deleted: {ownedComputers.map(b => b.name).join(", ")}.</p>
             : <p className="mb-3 text-sm text-[#6B6B6B]">Shared and externally connected computers stay.</p>}
           <div className="flex justify-end gap-2">
             <button disabled={busy} onClick={() => setConfirm(false)} className="rounded-lg border px-3 py-2 text-sm disabled:opacity-50">Back</button>

@@ -11,7 +11,7 @@
     "lint": "eslint",
     "app": "electron .",
     "app:fast": "npm run build && BOPS_APP_PRODUCTION=1 electron .",
-    "app:build": "npm run build && node scripts/prune-standalone.cjs && node -e \"require('fs').writeFileSync('desktop/repo.json', JSON.stringify({ path: process.cwd() }))\" && electron-builder --mac --dir -c.mac.identity=null -c.productName=\"Better Than GrokBot\" -c.appId=ai.orgo.bops.selfhosted",
+    "app:build": "npm run build && node scripts/prune-standalone.cjs && node -e \"require('fs').writeFileSync('desktop/repo.json', JSON.stringify({ path: process.cwd() }))\" && electron-builder --mac --dir -c.mac.identity=null -c.productName=\"Better than GrokBot\" -c.appId=ai.orgo.bops.selfhosted",
     "app:install": "node scripts/install-selfhost.cjs",
     "fast": "next build && next start --port 3210",
     "app:release": "scripts/release.sh",
@@ -24,7 +24,8 @@
     "instances:setup": "node scripts/instances.cjs setup",
     "instances:enable": "node scripts/instances.cjs enable",
     "instances:status": "node scripts/instances.cjs status",
-    "site:package": "node scripts/package-site.cjs"
+    "site:package": "node scripts/package-site.cjs",
+    "brand:render": "node scripts/render-brand.mjs"
   },
   "dependencies": {
     "@ag-ui/core": "1.0.1",
@@ -65,10 +66,10 @@
     "typescript": "^5"
   },
   "main": "desktop/main.cjs",
-  "productName": "Better Than GrokBot",
+  "productName": "Better than GrokBot",
   "build": {
     "appId": "ai.orgo.bops.selfhosted",
-    "productName": "Better Than GrokBot",
+    "productName": "Better than GrokBot",
     "directories": {
       "output": "dist-desktop"
     },
@@ -151,7 +152,7 @@
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.inherit.plist",
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "Better Than GrokBot uses your microphone when you call one of your bots."
+        "NSMicrophoneUsageDescription": "Better than GrokBot uses your microphone when you call one of your bots."
       }
     },
     "dmg": {

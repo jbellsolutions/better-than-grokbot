@@ -47,8 +47,6 @@ export function Sidebar({
   onOpenWatch: (watch: Watch) => void;
 }) {
   const [query, setQuery] = useState<string | null>(null);
-  const [opsBusy, setOpsBusy] = useState(false);
-  const [opsError, setOpsError] = useState("");
   const q = query?.trim().toLowerCase();
   // The "5m" next to each chat stays current.
   useNow(30_000);
@@ -78,16 +76,6 @@ export function Sidebar({
     if (from !== to && orderedChats.some(c => c.id === from) && orderedChats.some(c => c.id === to))
       void saveOrder(moveConversation(orderedChats.map(c => c.id), from, to));
     setDragged(null); setDropTarget(null);
-  };
-  const addOps = async () => {
-    setOpsBusy(true); setOpsError("");
-    try {
-      const name = team.some(b => b.name.toLowerCase() === "bapi") ? "Head of Ops" : "Bapi";
-      const res = await post("/api/bots", { name, role: "Head of Operations", teamRole: "operations" });
-      const data = await res.json(); if (!res.ok) throw Error(data.error || "Could not add the operations lead.");
-      onOpenChat(data.chatId);
-    } catch (e) { setOpsError((e as Error).message); }
-    finally { setOpsBusy(false); }
   };
   const hidden = team.filter(b => b.hidden && !b.isMain);
   const [visibilityError, setVisibilityError] = useState("");
@@ -179,8 +167,6 @@ export function Sidebar({
           })}
         </div>
 
-        {!q && !team.some(b => b.teamRole === "operations") && <button disabled={opsBusy} onClick={() => void addOps()} className="mx-2 mt-2 rounded-xl border border-dashed border-[#D9D9D6] px-3 py-2 text-left text-[12px] text-[#6B6B6B] hover:bg-white">{opsBusy ? "Adding Bapi…" : "+ Add head of operations"}</button>}
-        {opsError && <span role="alert" className="px-3 py-2 text-[12px] text-[#B42318]">{opsError}</span>}
 
         {hidden.length > 0 && <details className="mx-2 mt-3 text-xs text-[#6B6B6B]">
           <summary className="cursor-pointer py-2">Hidden profiles ({hidden.length})</summary>
@@ -356,7 +342,7 @@ function ChatRow({ chat: c, state, selected, unread, onClick, last }: { chat: Ch
           : last.text
       : solo
         ? solo.isMain
-          ? "Your chief of staff. Ask for anything."
+          ? "Your Head of Ops orchestrator. Give it a project charter."
           : `${solo.role}. Say hi.`
         : `${members.map((m) => m.name).join(", ")} and you`;
 

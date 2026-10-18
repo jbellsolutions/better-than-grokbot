@@ -4,7 +4,7 @@ import { createContext, useContext } from "react";
 import { mascotMarkup } from "@/lib/mascot";
 
 /**
- * Plush-style bot mascots with headphones (lib/mascot.ts draws them). Every mascot in the app reads
+ * The fork's arrow figures (lib/mascot.ts draws them). Every mascot in the app reads
  * which bots are at work from one place (BusyBots, set at the top of the app): a busy bot opens its
  * eyes, an idle one vibes with them closed.
  */
@@ -19,7 +19,7 @@ export function Mascot({
   botId: string;
   color: string;
   size?: number;
-  /** The main bot's highlighter headphones; false draws them in ink (the chat pill's small mark). */
+  /** The main agent's accent color; false draws its arrow in white (the chat pill's small mark). */
   antenna?: boolean;
 }) {
   const awake = useContext(BusyBots).has(botId);

@@ -66,7 +66,7 @@ export function ApprovalCard({ state, approval: a, compact }: { state: AppState;
             )}
           </span>
           {s && <span className="truncate text-[12px] leading-4 text-[#6B6B6B]">For &ldquo;{s.title}&rdquo;</span>}
-          <span className="text-[12px] leading-4 text-[#6B6B6B]">Computer: {state.instance?.name ?? "Current Bops"}</span>
+          <span className="text-[12px] leading-4 text-[#6B6B6B]">Computer: {state.instance?.name ?? "Better than GrokBot"}</span>
         </div>
       </div>
       {a.requestedPermissions && <pre className="max-h-32 overflow-auto whitespace-pre-wrap text-xs">{JSON.stringify(a.requestedPermissions, null, 2)}</pre>}
@@ -173,7 +173,7 @@ export function MacSettings({ state }: { state: AppState }) {
         <div className={section}>
           <div className="flex flex-col gap-0.5">
             <span className={heading}>These mean your Mac</span>
-            <span className={sub}>A task that mentions one of these runs on your Mac. Otherwise Better Than GrokBot decides, and asks you when it can&apos;t tell.</span>
+            <span className={sub}>A task that mentions one of these runs on your Mac. Otherwise Better than GrokBot decides, and asks you when it can&apos;t tell.</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
             {m?.rules.map((r) => (
