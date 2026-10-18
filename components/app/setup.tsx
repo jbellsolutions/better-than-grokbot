@@ -69,7 +69,7 @@ function usePermissions(every: number) {
   const inApp = useMacApp();
   const [status, setStatus] = useState<Partial<Record<PermId, PermStatus>> | null>(null);
   const [restart, setRestart] = useState(false);
-  const [appName, setAppName] = useState("Better Than GrokBot");
+  const [appName, setAppName] = useState("Better than GrokBot");
   const [error, setError] = useState("");
   const checking = useRef(false);
   const refresh = useCallback(async () => {
@@ -82,7 +82,7 @@ function usePermissions(every: number) {
         Promise.all([b.appName?.(), b.permissions.status(), b.screenNeedsRestart?.()]),
         new Promise<never>((_, reject) => { timeout = setTimeout(() => reject(Error("Permission check unavailable. Try again.")), 5000); }),
       ]);
-      setAppName(values[0] ?? "Better Than GrokBot"); setStatus(values[1]); setRestart(!!values[2]); setError("");
+      setAppName(values[0] ?? "Better than GrokBot"); setStatus(values[1]); setRestart(!!values[2]); setError("");
     } catch (e) {
       setStatus({ screen: "unknown", microphone: "unknown", notifications: "unknown", accessibility: "unknown" });
       setError((e as Error).message);
@@ -249,7 +249,7 @@ const ICONS = {
 };
 
 const COPY: Record<"screen" | "microphone" | "notifications", { title: string; line: string }> = {
-  screen: { title: "Screen recording", line: "See your Mac live in Better Than GrokBot, and watch bots work on it." },
+  screen: { title: "Screen recording", line: "See your Mac live in Better than GrokBot, and watch bots work on it." },
   microphone: { title: "Microphone", line: "Talk to your bots on a call." },
   notifications: { title: "Notifications", line: "Hear from bots when something needs you." },
 };
@@ -259,7 +259,7 @@ function PermissionCard({ id, items }: { id: "screen" | "microphone" | "notifica
   const s = perms.status?.[id];
   const copy = COPY[id];
   if (!perms.inApp)
-    return <Card icon={ICONS[id]} title={copy.title} line={copy.line} tone="none" status="Needs the Better Than GrokBot app for Mac" />;
+    return <Card icon={ICONS[id]} title={copy.title} line={copy.line} tone="none" status="Needs the Better than GrokBot app for Mac" />;
   if (!s) return <Card icon={ICONS[id]} title={copy.title} line={copy.line} tone="none" status="Checking" />;
   // Screen Recording turned on while Bops was open: macOS applies it on the next launch.
   const restart = id === "screen" && (perms.restart || (s !== "granted" && sentToSettings.has("screen")));
@@ -350,7 +350,7 @@ function ComputerUseCard({ items }: { items: Items }) {
     }
     setBusy(false);
   };
-  const card = { icon: ICONS.computerUse, title: "Computer use on your Mac", line: "Bots use apps on this Mac through Codex. You approve each app the first time. Codex Computer Use has its own Screen Recording and Accessibility permissions, separate from Better Than GrokBot." };
+  const card = { icon: ICONS.computerUse, title: "Computer use on your Mac", line: "Bots use apps on this Mac through Codex. You approve each app the first time. Codex Computer Use has its own Screen Recording and Accessibility permissions, separate from Better than GrokBot." };
   if (!m) return <Card {...card} tone="none" status={error ?? "Checking"}>{error && <button onClick={() => void check()} className={light}>Retry check</button>}</Card>;
   if (m.ready) return <Card {...card} tone="ok" status={m.plan && m.plan !== "unknown" ? `Ready on your ${planName(m.plan)} plan` : "Ready"} />;
   if (m.next === "permission") return <Card {...card} tone="todo" status={error ?? m.reason ?? "Allow this computer to use your Mac"}>
@@ -448,11 +448,11 @@ export function Setup({ state, onClose }: { state: AppState; onClose: () => void
       >
         <div className="flex flex-col items-center gap-1.5 pb-5 text-center">
           <Mascot botId="boppy" color="#0A0A0A" size={48} />
-          <span className="pt-3 text-[20px] font-semibold leading-6 tracking-[-0.01em]">Set up Better Than GrokBot on this Mac</span>
+          <span className="pt-3 text-[20px] font-semibold leading-6 tracking-[-0.01em]">Set up Better than GrokBot on this Mac</span>
           <span className="max-w-[380px] text-[13.5px] leading-[19px] text-pencil">
             {items.perms.inApp
               ? "A few things your bots need. Allow what you want now; you can change any of it later in Settings."
-              : "Screen, microphone and notifications need the Better Than GrokBot app for Mac. You can set up the rest here."}
+              : "Screen, microphone and notifications need the Better than GrokBot app for Mac. You can set up the rest here."}
           </span>
         </div>
         <div className="flex flex-col gap-2">

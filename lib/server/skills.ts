@@ -46,7 +46,7 @@ export function appsNote(b: Bot, mode: Mode, opts: { tools?: boolean } = {}) {
   const list = appList(b);
   const missing = notMine(b);
   const ask = missing.length
-    ? `Through Bops, ${owner} also has ${listed(missing)} connected, which you can't use yet. When they ask what you can use, or a job needs one of these, tell them they can give you access in the Vault (on your profile): it's faster and more reliable than doing it on a computer.`
+    ? `Through Better than GrokBot, ${owner} also has ${listed(missing)} connected, which you can't use yet. When they ask what you can use, or a job needs one of these, tell them they can give you access in the Vault (on your profile): it's faster and more reliable than doing it on a computer.`
     : "";
   if (!list) {
     if (mode !== "chat") return ask;
@@ -71,7 +71,7 @@ export function appsNote(b: Bot, mode: Mode, opts: { tools?: boolean } = {}) {
       : `use_app asks them for you and waits for their answer, so don't ask first`;
   return [
     yours,
-    `They work through Bops' app gateway (Composio's tool router), which knows every action each app has. To use one: first call find_app_actions with the job in plain words ("add a row to the Q3 budget sheet", "my open Jira issues"); it searches only your apps and answers with the exact action names (like GOOGLESHEETS_BATCH_UPDATE), their inputs, how to use them and known pitfalls. Then call use_app with one exact name from that answer and its inputs. With more than one account in an app, set account to the one the job is about (its label or address, as listed above) and say which you used.`,
+    `They work through Better than GrokBot' app gateway (Composio's tool router), which knows every action each app has. To use one: first call find_app_actions with the job in plain words ("add a row to the Q3 budget sheet", "my open Jira issues"); it searches only your apps and answers with the exact action names (like GOOGLESHEETS_BATCH_UPDATE), their inputs, how to use them and known pitfalls. Then call use_app with one exact name from that answer and its inputs. With more than one account in an app, set account to the one the job is about (its label or address, as listed above) and say which you used.`,
     `Never make up an action name or guess its inputs: if nothing fits, search again with other words. Reading runs at once. Small changes only to ${owner}'s own things (a label, a draft for them) may go at once; anything that sends, posts, shares, deletes or pays waits for ${owner}'s OK: ${asking}.`,
     `Use your apps before doing the same thing on a screen: they act in ${owner}'s real accounts, faster and surer.`,
     ask,
@@ -86,11 +86,11 @@ const KIND_NAME = { slack: "Slack", telegram: "Telegram", discord: "Discord" } a
 function channelPlace(l: ChannelLink, owner: string) {
   const where =
     l.kind === "slack"
-      ? `in Slack (${l.handle}: ${[...(l.slack?.channels ?? []).map((c) => `#${c.name}`), "direct messages with the Bops app"].join(", ")})`
+      ? `in Slack (${l.handle}: ${[...(l.slack?.channels ?? []).map((c) => `#${c.name}`), "direct messages with the Better than GrokBot app"].join(", ")})`
       : l.kind === "telegram"
         ? `in Telegram as ${l.handle}`
         : `in Discord as ${l.handle}${l.discord?.username && l.discord.username !== l.handle ? ` (${l.discord.username})` : ""}`;
-  if (l.status === "error") return `${where}, not working right now (${(l.error ?? "it needs attention in Bops").replace(/\.$/, "")})`;
+  if (l.status === "error") return `${where}, not working right now (${(l.error ?? "it needs attention in Better than GrokBot").replace(/\.$/, "")})`;
   return l.owner ? where : `${where}, not paired yet (until ${owner} sends you the pairing code there, you answer only the code)`;
 }
 
@@ -105,12 +105,12 @@ export function placesNote(b: Bot, mode: Mode) {
     ...channels.map((l) => channelPlace(l, owner)),
   ];
   // iMessage lines can't take calls (they can't be trunked to the voice model); other numbers can.
-  const calls = `on a call in the Bops app${line && line.type !== "imessage" ? ` or to ${line.phone}` : ""}`;
+  const calls = `on a call in the Better than GrokBot app${line && line.type !== "imessage" ? ` or to ${line.phone}` : ""}`;
   if (mode === "task")
-    return `Besides Bops, ${owner} reaches you ${[calls, ...elsewhere].join("; ")}. When this task was asked from one of those places, your final answer goes back there on its own: don't send it there yourself.`;
-  if (mode === "call") return `Besides calls, ${owner} reaches you ${["in Bops", ...elsewhere].join("; ")}.`;
+    return `Besides Better than GrokBot, ${owner} reaches you ${[calls, ...elsewhere].join("; ")}. When this task was asked from one of those places, your final answer goes back there on its own: don't send it there yourself.`;
+  if (mode === "call") return `Besides calls, ${owner} reaches you ${["in Better than GrokBot", ...elsewhere].join("; ")}.`;
   return [
-    `Where ${owner} reaches you: here in Bops; ${[calls, ...elsewhere].join("; ")}.`,
+    `Where ${owner} reaches you: here in Better than GrokBot; ${[calls, ...elsewhere].join("; ")}.`,
     channels.length
       ? `A message marked ${listed([...new Set(channels.map((l) => `[in ${KIND_NAME[l.kind]}]`))], "or")} is ${owner} writing to you there (only the account they paired counts as them; nobody else's messages reach you). Answer it like a text: your reply goes back there on its own, and so does the result of any task you start or hand off for it. Keep those replies short and plain, no tables. In a group or channel you answer only when mentioned or replied to.`
       : "",

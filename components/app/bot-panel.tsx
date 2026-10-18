@@ -70,7 +70,7 @@ export function BotPanel({
         <Mascot botId={b.id} color={b.color} size={52} />
         <div className="flex flex-col items-center gap-px">
           <div className="text-[20px] font-semibold leading-6 tracking-[-0.01em]">{b.name}</div>
-          <div className="text-[13px] leading-4 text-[#6B6B6B]">{b.isMain ? `${b.role} · runs the team` : `${b.role} · Better Than GrokBot team`}</div>
+          <div className="text-[13px] leading-4 text-[#6B6B6B]">{b.isMain ? `${b.role} · runs the team` : `${b.role} · Better than GrokBot team`}</div>
         </div>
         {tabs}
       </div>
@@ -137,7 +137,7 @@ function Details({
   const glass = "bg-white/60 shadow-[inset_0_0_0_1px_#FFFFFF,0_0_0_1px_#0000000F]";
 
   const share = async () => {
-    await navigator.clipboard.writeText([`${b.name} (${b.role}, Better Than GrokBot)`, b.phone, b.email].filter(Boolean).join("\n"));
+    await navigator.clipboard.writeText([`${b.name} (${b.role}, Better than GrokBot)`, b.phone, b.email].filter(Boolean).join("\n"));
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
@@ -149,7 +149,7 @@ function Details({
       </div>
       <div className="flex flex-col items-center gap-0.5">
         <div className="text-[26px] font-bold leading-[30px] tracking-[-0.02em]">{b.name}</div>
-        <div className="text-[13px] font-medium leading-4 text-[#3A3A38]">{b.isMain ? `${b.role} · runs the team` : `${b.role} · Better Than GrokBot team`}</div>
+        <div className="text-[13px] font-medium leading-4 text-[#3A3A38]">{b.isMain ? `${b.role} · runs the team` : `${b.role} · Better than GrokBot team`}</div>
       </div>
       <button onClick={() => setEditing(!editing)} className="text-[12px] font-medium underline underline-offset-2">{editing ? "Close editor" : "Edit name and role"}</button>
       {editing && <ProfileEditor key={`editor-${b.id}`} bot={b} onDone={() => setEditing(false)} />}
@@ -309,7 +309,7 @@ function ComputerChoice({ state, bot: b, className }: { state: AppState; bot: Bo
           <span className="text-[13px] font-semibold leading-4">Computer</span>
           <span className="text-[12px] leading-4 text-[#6B6B6B]">
             {b.isMain
-              ? `Works on your free Better Than GrokBot computer, which ${main.name} has, with ${b.name}'s team`
+              ? `Works on your free Better than GrokBot computer, which ${main.name} has, with ${b.name}'s team`
               : shared
                 ? `Works on ${main.name}'s computer, on screens no one else is using`
                 : "Its own cloud computer, a copy of the main bot's"}
@@ -571,7 +571,7 @@ function AlwaysAllowed({ state, bot: b, className }: { state: AppState; bot: Bot
 function Phone({ bot: b }: { bot: Bot }) {
   return <div className="flex flex-col gap-3 rounded-2xl bg-[#F7F7F6] p-5 text-[13px] leading-5">
     <span className="font-semibold">Messages, calls and phone access</span>
-    <span>Message on the Details tab opens {b.name}’s Better Than GrokBot chat. A dedicated SMS/call number needs AgentPhone configured separately.</span>
+    <span>Message on the Details tab opens {b.name}’s Better than GrokBot chat. A dedicated SMS/call number needs AgentPhone configured separately.</span>
     {b.phone ? <span>Phone number: {prettyPhone(b.phone)}</span> : <span className="text-[#6B6B6B]">No phone number is connected for this agent.</span>}
     <GetNumber bot={b} />
     <span className="text-[#6B6B6B]">The upstream app’s cloud phone device feature is not implemented. For work in your Mac’s Messages app, ask the agent to use your Mac through Codex.</span>
@@ -618,7 +618,7 @@ function ContactSetup({ bot }: { bot: Bot }) {
   };
   if (bot.email) return null;
   return <div className="flex w-full flex-col gap-2 rounded-2xl bg-white/70 px-4 py-3 text-[12px] leading-4 shadow-[0_0_0_1px_#0000000F]">
-    <span>Message opens this agent’s Better Than GrokBot chat. Email needs an AgentMail inbox; SMS and calls need a separate phone provider and number.</span>
+    <span>Message opens this agent’s Better than GrokBot chat. Email needs an AgentMail inbox; SMS and calls need a separate phone provider and number.</span>
     {mail ? <button onClick={() => void setup()} disabled={busy} className="self-start rounded-full bg-ink px-3 py-1.5 font-medium text-white disabled:opacity-50">{busy ? "Creating inbox…" : "Create agent inbox"}</button> : <span className="text-[#6B6B6B]">Connect AgentMail to enable email. <a className="underline" href="https://console.agentmail.to" target="_blank" rel="noreferrer">Get an AgentMail key</a></span>}
     {error && <span role="alert" className="text-[#B42318]">{error}</span>}
   </div>;

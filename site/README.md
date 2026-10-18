@@ -1,4 +1,4 @@
-# Better Than GrokBot website
+# Better than GrokBot website
 
 A static, responsive one-page site (https://betterthangrokbot.com). The workspace demo is illustrative; the free download contains source, license and setup instructions. Provider usage costs are separate.
 

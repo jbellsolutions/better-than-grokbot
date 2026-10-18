@@ -1,3 +1,4 @@
+import { MAIN_AGENT_ROLE, PRODUCT_NAME } from "@/lib/brand";
 import "server-only";
 import { botChatId, MAIN_WORKSPACE, type Bot } from "@/lib/types";
 import { freeBotId } from "./bots";
@@ -11,11 +12,11 @@ import { ensureInbox } from "./mail";
 export function createWorkspace(name: string) {
   const clean = name.trim().slice(0, 40) || "New workspace";
   const ws = id("ws");
-  const mainId = freeBotId("Boppy");
+  const mainId = freeBotId(PRODUCT_NAME);
   const main: Bot = {
     id: mainId,
-    name: "Boppy",
-    role: "Chief of Staff",
+    name: PRODUCT_NAME,
+    role: MAIN_AGENT_ROLE,
     color: "#0A0A0A",
     isMain: true,
     computerStatus: "none",

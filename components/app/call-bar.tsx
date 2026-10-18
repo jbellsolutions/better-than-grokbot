@@ -269,7 +269,7 @@ export function CallBar({ bot: b, owner, onClose, compact, onOpen }: { bot: Bot;
       } catch (e) {
         if (gone) return;
         hush();
-        setError((e as Error).message.includes("Permission") ? "Better Than GrokBot needs microphone access for calls." : (e as Error).message);
+        setError((e as Error).message.includes("Permission") ? "Better than GrokBot needs microphone access for calls." : (e as Error).message);
         setPhase("failed");
         cleanup();
       }

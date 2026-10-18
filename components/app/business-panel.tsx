@@ -221,7 +221,7 @@ export function BusinessPanel({ state, onChat, onThread, onProfile }: {
             </div>}</>}
     {section === 'Hermes history' && <>
         <input className={input} placeholder="Search conversation titles" value={query} onChange={e => { setQuery(e.target.value); setSourceId(''); setHistoryPage(0); }}/>
-        <p className="my-3 text-xs text-[#6B6B6B]">Read-only conversations from this computer’s existing Hermes database. Continuing starts a new Bops thread with selected context.</p>{sourceId && <button className={button} onClick={() => { setSourceId(''); setHistoryPage(0); }}>Back to conversations</button>}{!history ? <p className="my-4 text-sm">Loading…</p> : history.sessions?.map(s => <button key={s.id} className="my-2 block w-full rounded-xl border bg-white p-3 text-left" onClick={() => { setSourceId(s.id); setHistoryPage(0); }}>
+        <p className="my-3 text-xs text-[#6B6B6B]">Read-only conversations from this computer’s existing Hermes database. Continuing starts a new Better than GrokBot thread with selected context.</p>{sourceId && <button className={button} onClick={() => { setSourceId(''); setHistoryPage(0); }}>Back to conversations</button>}{!history ? <p className="my-4 text-sm">Loading…</p> : history.sessions?.map(s => <button key={s.id} className="my-2 block w-full rounded-xl border bg-white p-3 text-left" onClick={() => { setSourceId(s.id); setHistoryPage(0); }}>
             <strong className="text-sm">{s.title || s.id}</strong>
             <p className="text-xs text-[#6B6B6B]">{s.profile_name || s.source} · {s.message_count} messages · {new Date(s.started_at * 1000).toLocaleDateString()}</p>
             </button>)}{history?.messages?.map(m => <article key={m.id} className="my-2 rounded-xl border bg-white p-3">
@@ -237,7 +237,7 @@ export function BusinessPanel({ state, onChat, onThread, onProfile }: {
         <select className={input} value={fileRoot} onChange={e => { setFileRoot(e.target.value); setFilePath(''); }}>
         <option value="workspace">Workspace files</option>
         <option value="hermes-home">Hermes home files</option>
-        <option value="artifacts">Bops task artifacts</option>
+        <option value="artifacts">Better than GrokBot task artifacts</option>
         </select>
         <p className="my-3 text-xs text-[#6B6B6B]">{filePath || '/'} · read-only. Credential paths and symbolic links are excluded.</p>
         <button className={button} disabled={!filePath} onClick={() => setFilePath(filePath.split('/').slice(0, -1).join('/'))}>Up one folder</button>{files?.text !== undefined ? <pre className="mt-3 whitespace-pre-wrap break-words rounded-xl border bg-white p-3 text-xs">{files.text}</pre> : files?.files?.map(f => <button key={f.path} className="my-1 block w-full rounded-xl border bg-white p-3 text-left text-sm" onClick={() => setFilePath(f.path)}>{f.directory ? 'Folder · ' : ''}{f.name} <span className="text-xs text-[#6B6B6B]">{f.bytes} bytes</span>

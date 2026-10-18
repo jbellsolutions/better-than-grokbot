@@ -43,7 +43,7 @@ export function AccountComputers({ state, bot, className }: { state: AppState; b
       <span className="text-[13px] font-semibold">Orgo computer</span>
       <button onClick={() => void refresh()} disabled={loading || busy} className="text-[12px] underline disabled:opacity-50">{loading ? "Loading…" : "Refresh"}</button>
     </div>
-    <span className="text-[12px] text-[#6B6B6B]">{sharesComputer(bot) ? `Shares ${host.name}’s computer` : computers.find((c) => c.id === bot.computerId)?.name ?? bot.computerName ?? "Assigned computer"}. Your Better Than GrokBot agents, chats, and model choices stay with this team. The selected computer brings its own files and browser state; other agent systems on it are not imported.</span>
+    <span className="text-[12px] text-[#6B6B6B]">{sharesComputer(bot) ? `Shares ${host.name}’s computer` : computers.find((c) => c.id === bot.computerId)?.name ?? bot.computerName ?? "Assigned computer"}. Your Better than GrokBot agents, chats, and model choices stay with this team. The selected computer brings its own files and browser state; other agent systems on it are not imported.</span>
     <label className="flex flex-col gap-1 text-[12px] text-[#6B6B6B]">Choose from your Orgo account
       <select aria-label={`Computer for ${bot.name}`} value={pick} onChange={(e) => { setSelected(e.target.value); setChanged(false); }} disabled={loading || busy} className="w-full rounded-xl bg-white px-3 py-2 text-[13px] text-ink shadow-[0_0_0_1px_#00000015]">
         {!bot.isMain && <option value="shared">Share the main agent’s computer</option>}
@@ -52,7 +52,7 @@ export function AccountComputers({ state, bot, className }: { state: AppState; b
         {computers.map((c) => <option key={c.id} value={c.id} disabled={c.os !== "linux" || c.status !== "running"}>{c.name}{c.workspaceName ? ` · ${c.workspaceName}` : ""} · {c.status} · {c.ram} GB{c.os !== "linux" ? " · Linux required" : ""}</option>)}
       </select>
     </label>
-    <span className="text-[12px] leading-4 text-[#6B6B6B]">On first use, Better Than GrokBot installs its browser and screen tools on your selected Linux computer. Other software stays installed. Start stopped computers in Orgo first.</span>
+    <span className="text-[12px] leading-4 text-[#6B6B6B]">On first use, Better than GrokBot installs its browser and screen tools on your selected Linux computer. Other software stays installed. Start stopped computers in Orgo first.</span>
     {pick !== current && <button disabled={busy || !pick} onClick={() => void save()} className="self-start rounded-full bg-ink px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-50">{busy ? "Switching…" : "Use this computer"}</button>}
     {changed && <span role="status" className="text-[12px] text-[#067647]">Computer assignment saved.</span>}
     {error && <span role="alert" className="text-[12px] text-[#B42318]">{error}</span>}

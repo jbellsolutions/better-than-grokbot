@@ -8,20 +8,19 @@ const ts = require('typescript');
 const { spawn } = require('node:child_process');
 const load = require('./helpers/load-ts.cjs');
 
-test('current and twenty future teams each retain an orchestrator and one separate, renameable Ops agent', () => {
+test('current and twenty future teams each have one main Head of Ops orchestrator', () => {
   const { ensureTeamOperations } = load('lib/team-operations.ts');
   const state = { bots: Array.from({length: 21}, (_,i)=>({id:`lead-${i}`,name:`Computer ${i}`,workspaceId:`team-${i}`,isMain:true,instructions:'Keep my charter',computerId:`computer-${i}`})), chats: [], messages: [{text:'Keep history'}] };
   ensureTeamOperations(state);
-  assert.equal(state.bots.length, 42);
+  assert.equal(state.bots.length, 21);
   for (let i=0;i<21;i++) {
     const team=state.bots.filter(b=>b.workspaceId===`team-${i}`);
     assert.equal(team.filter(b=>b.isMain).length,1); assert.equal(team.filter(b=>b.teamRole==='operations').length,1);
-    const ops=team.find(b=>b.teamRole==='operations'); assert.equal(ops.computer,'shared'); assert.equal(ops.isMain,false);
-    assert.ok(state.chats.some(c=>c.id===`bot:${ops.id}`));
+    const ops=team.find(b=>b.teamRole==='operations'); assert.equal(ops.isMain,true); assert.equal(ops.role,'Head of Ops · Orchestrator');
     ops.name=`My Ops ${i}`; ops.instructions='Keep these instructions'; ops.hidden=i%2===0;
   }
   const before=JSON.stringify(state); ensureTeamOperations(state); assert.equal(JSON.stringify(state),before);
-  assert.equal(new Set(state.bots.map(b=>b.id)).size,42);
+  assert.equal(new Set(state.bots.map(b=>b.id)).size,21);
 });
 
 test('store migration and later team creation establish Ops without provider calls or rewriting history', () => {
