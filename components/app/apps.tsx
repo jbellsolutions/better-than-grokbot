@@ -122,6 +122,11 @@ export function AppsSection({ state }: { state: AppState }) {
               {c.status === "failed" ? `Couldn't connect: ${c.error ?? "try again"}` : "Finish signing in in your browser…"}
             </span>
           </span>
+          {c.status === "waiting" && c.url && (
+            <a href={c.url} target="_blank" rel="noreferrer" className="shrink-0 rounded-full px-2 py-1 text-[12px] font-medium text-ink underline underline-offset-2 hover:bg-[#F2F2F0]">
+              Open sign-in page
+            </a>
+          )}
           {c.status === "waiting" ? <Spinner size={14} /> : (
             <button onClick={() => void post("/api/apps", { app: c.app, label: c.label, grant: c.grant, replaces: c.replaces })} className="shrink-0 rounded-full bg-ink px-3 py-1 text-[12px] font-medium leading-4 text-white">
               Try again

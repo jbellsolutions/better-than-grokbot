@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import { CHANNELS, PAIR_CODE_MS, PAIR_CODE_TRIES, pairCodeLive, workspaceOf, type AppState, type Bot, type ChannelLink } from "@/lib/types";
 import { Spinner } from "./mascot";
-import { BrandTile, post } from "./ui";
+import { BrandTile, post, SecretsHome } from "./ui";
 
 /*
  * Where to find a bot: the places it lives besides Bops. One row of tiles; a tile that's set up says
@@ -90,6 +90,7 @@ function Setup({ state, bot: b, kind, link }: { state: AppState; bot: Bot; kind:
 
 /** Telegram and Discord: make the bot's account there, paste its token. */
 function TokenSetup({ bot: b, kind }: { bot: Bot; kind: "telegram" | "discord" }) {
+  const keptIn = useContext(SecretsHome);
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -154,7 +155,7 @@ function TokenSetup({ bot: b, kind }: { bot: Bot; kind: "telegram" | "discord" }
         </button>
       </div>
       {error && <span className="text-[12px] leading-4 text-[#B42318]">{error}</span>}
-      <span className="text-[11.5px] leading-4 text-[#9A9A98]">The token stays in your Mac&apos;s Keychain. {b.name} takes requests only from you there.</span>
+      <span className="text-[11.5px] leading-4 text-[#9A9A98]">The token stays in {keptIn}. {b.name} takes requests only from you there.</span>
     </div>
   );
 }
@@ -164,6 +165,7 @@ function TokenSetup({ bot: b, kind }: { bot: Bot; kind: "telegram" | "discord" }
  * secret, pasted once. They go to this Mac's Keychain; its workspace then shows as a Slack account.
  */
 function SlackAppForm() {
+  const keptIn = useContext(SecretsHome);
   const [token, setToken] = useState("");
   const [secret, setSecret] = useState("");
   const [busy, setBusy] = useState(false);
@@ -191,7 +193,7 @@ function SlackAppForm() {
         <button onClick={() => void save()} disabled={busy || !token.trim() || !secret.trim()} className={primary}>
           {busy ? "Checking…" : "Use this app"}
         </button>
-        <span className="text-[11.5px] leading-4 text-[#9A9A98]">They stay in your Mac&apos;s Keychain.</span>
+        <span className="text-[11.5px] leading-4 text-[#9A9A98]">They stay in {keptIn}.</span>
       </div>
       {error && <span className="text-[12px] leading-4 text-[#B42318]">{error}</span>}
     </div>

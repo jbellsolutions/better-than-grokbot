@@ -182,6 +182,12 @@ async function authConfigFor(app: string) {
   return (await cx().authConfigs.create(app, { type: "use_custom_auth", authScheme: mode as never, name: `${tk.name} (Bops)`, credentials: {} })).id;
 }
 
+/** Open a page in the default browser of the computer running Bops (Mac, Windows or Linux). */
+function openPage(url: string) {
+  if (process.platform === "win32") execFile("rundll32", ["url.dll,FileProtocolHandler", url]);
+  else execFile(process.platform === "darwin" ? "open" : "xdg-open", [url]);
+}
+
 /**
  * Connect an account: Composio's sign-in page opens in the user's browser (it asks for an API key
  * where the app has no sign-in), and the account appears here once they finish. Another account in
@@ -206,9 +212,9 @@ export async function connectApp(app: string, label?: string, replaces?: string,
   const waitId = req.id;
   update((s) => {
     s.connecting = (s.connecting ?? []).filter((c) => !(c.app === app && c.status === "failed"));
-    s.connecting.push({ id: waitId, app, appName, label: label?.trim() || undefined, status: "waiting", at: Date.now(), replaces, grant });
+    s.connecting.push({ id: waitId, app, appName, label: label?.trim() || undefined, status: "waiting", at: Date.now(), replaces, grant, url: req.redirectUrl ?? undefined });
   });
-  if (req.redirectUrl) execFile("open", [req.redirectUrl]);
+  if (req.redirectUrl) openPage(req.redirectUrl);
   void req
     .waitForConnection(15 * 60_000)
     .then(async (ca: { id: string }) => {

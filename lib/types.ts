@@ -423,7 +423,7 @@ export type Owner = { name: string; about?: string };
 
 export type AppState = {
   /** Runtime identity supplied by the coordinator, not shared between instances. */
-  instance?: { id: string; name: string; computerId: string | null; observeOnly: boolean; timezone?: string };
+  instance?: { id: string; name: string; computerId: string | null; observeOnly: boolean; timezone?: string; secrets?: "keychain" | "file" };
   /** Who the bots work for. Empty until set in Settings. */
   owner?: Owner;
   bots: Bot[];
@@ -439,7 +439,7 @@ export type AppState = {
   screens?: Record<string, ScreenRead>;
   /** Screens a bot keeps open on a site and keeps an eye on for the user (an X inbox, LinkedIn messages). */
   watches?: Watch[];
-  /** Logins bots can sign in with. Only what's safe to show is here; secrets live in the Keychain. */
+  /** Logins bots can sign in with. Only what's safe to show is here; secrets live in the Keychain (lib/server/keychain.ts). */
   vault?: VaultLogin[];
   /** The user's own Mac, where bots can work through Codex's computer use. */
   mac?: MacState;
@@ -608,6 +608,8 @@ export type AppConnecting = {
   error?: string;
   at: number;
   replaces?: string;
+  /** The app's sign-in page: it opens on the computer running Bops; this link is for a phone, or if it didn't. */
+  url?: string;
   /** Bots that get access once it's connected (picked when connecting), and how much. */
   grant?: { bots: BotId[]; level: AppLevel };
 };

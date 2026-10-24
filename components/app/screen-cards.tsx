@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import type { Bot, ScreenRead, VaultLogin } from "@/lib/types";
 import { Mascot } from "./mascot";
-import { post } from "./ui";
+import { post, SecretsHome } from "./ui";
 
 /*
  * Generative cards: native Bops UI drawn over the bot's real page when Jev reads something on it
@@ -41,6 +41,7 @@ export function SignInCard({
   vault: VaultLogin[];
 }) {
   const form = read.form!;
+  const keptIn = useContext(SecretsHome);
   // Saved logins this bot may use on this site: one tap, filled from the Keychain.
   const pageHost = host(read.url);
   const saved = vault.filter((l) => (l.bots === "all" || l.bots.includes(b.id)) && (pageHost === l.site || pageHost.endsWith(`.${l.site}`)));
@@ -128,7 +129,7 @@ export function SignInCard({
           </button>
         </div>
         <span className="text-[11px] leading-[15px] text-[#9A9A98]">
-          Goes straight into the page on {b.name}&apos;s screen. {save ? "Saved logins stay in your Mac's Keychain." : "Better than GrokBot doesn't keep it."} No AI sees it.
+          Goes straight into the page on {b.name}&apos;s screen. {save ? `Saved logins stay in ${keptIn}.` : "Better than GrokBot doesn't keep it."} No AI sees it.
         </span>
       </form>
     </CardShell>

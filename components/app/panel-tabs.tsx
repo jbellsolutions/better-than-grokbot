@@ -48,6 +48,7 @@ export function TabBar({
   onPick,
   onClose,
   onNew,
+  compact,
 }: {
   state: AppState;
   tabs: PanelTab[];
@@ -56,12 +57,14 @@ export function TabBar({
   onPick: (id: string) => void;
   onClose: (id: string) => void;
   onNew: () => void;
+  /** A phone's bar: the open tab shows its name and its ×, the others only their icon, and it scrolls if they don't fit. */
+  compact?: boolean;
 }) {
   const all: PanelTab[] = [{ id: CHAT_TAB, kind: "computer", botId: chatBotId }, ...tabs];
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
+    <div className={`flex min-w-0 flex-1 items-center gap-1 ${compact ? "overflow-x-auto [scrollbar-width:none]" : "overflow-hidden"}`}>
       {all.map((t) => (
-        <Tab key={t.id} state={state} tab={t} on={t.id === active} closable={t.id !== CHAT_TAB} onPick={() => onPick(t.id)} onClose={() => onClose(t.id)} />
+        <Tab key={t.id} state={state} tab={t} on={t.id === active} closable={t.id !== CHAT_TAB && (!compact || t.id === active)} compact={compact} onPick={() => onPick(t.id)} onClose={() => onClose(t.id)} />
       ))}
       <button
         onClick={onNew}
@@ -77,7 +80,7 @@ export function TabBar({
   );
 }
 
-function Tab({ state, tab: t, on, closable, onPick, onClose }: { state: AppState; tab: PanelTab; on: boolean; closable: boolean; onPick: () => void; onClose: () => void }) {
+function Tab({ state, tab: t, on, closable, compact, onPick, onClose }: { state: AppState; tab: PanelTab; on: boolean; closable: boolean; compact?: boolean; onPick: () => void; onClose: () => void }) {
   const b = "botId" in t ? state.bots.find((x) => x.id === t.botId) : undefined;
   // A computer tab says when its bot is working, or when something there needs you.
   const tasks = state.sessions.filter(s => t.kind === "computer" ? s.botId === t.botId && s.runsOn !== "mac" : t.kind === "mac" && s.runsOn === "mac").map(workStatus);
@@ -94,7 +97,7 @@ function Tab({ state, tab: t, on, closable, onPick, onClose }: { state: AppState
       onClick={onPick}
       onAuxClick={(e) => e.button === 1 && closable && onClose()}
       title={t.kind === "web" ? t.url : [label, ...tasks.filter(s => s.attention || ["queued", "starting", "running"].includes(s.kind)).map(s => s.text)].join(" · ")}
-      className={`group/tab flex h-[30px] min-w-0 max-w-[220px] shrink cursor-default items-center gap-1.5 rounded-[10px] pl-2.5 ${closable ? "pr-1" : "pr-3"} text-[13px] leading-4 [-webkit-app-region:no-drag] ${
+      className={`group/tab flex h-[30px] ${compact ? (on ? "min-w-0 max-w-[150px] shrink-0" : "shrink-0") : "min-w-0 max-w-[220px] shrink"} cursor-default items-center gap-1.5 rounded-[10px] pl-2.5 ${closable ? "pr-1" : "pr-3"} text-[13px] leading-4 [-webkit-app-region:no-drag] ${
         on ? "bg-white text-ink shadow-[0_0_0_1px_#0000000F,0_2px_6px_-3px_#00000026]" : "text-[#6B6B6B] hover:bg-[#EEEEEC]"
       }`}
     >
@@ -109,7 +112,7 @@ function Tab({ state, tab: t, on, closable, onPick, onClose }: { state: AppState
       ) : (
         <GlobeIcon />
       )}
-      <span className={`truncate ${on ? "font-medium" : ""}`}>{label}</span>
+      <span className={`truncate ${on ? "font-medium" : compact ? "sr-only" : ""}`}>{label}</span>
       {needsYou ? (
         <span className="size-[7px] shrink-0 rounded-full bg-highlighter shadow-[0_0_0_1.5px_#0A0A0A]" title="Needs you" />
       ) : working ? (

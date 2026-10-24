@@ -45,6 +45,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Saved logins and tokens without a Keychain
+        run: node --test test/secrets-file.test.cjs
       - run: npm run build
       - name: The server starts and answers
         shell: pwsh

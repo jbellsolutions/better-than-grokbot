@@ -1,4 +1,5 @@
 import { instanceInfo } from "@/lib/server/instance";
+import { secretStore } from "@/lib/server/keychain";
 import "@/lib/server/routines";
 import "@/lib/server/watches";
 import "@/lib/server/codex";
@@ -34,5 +35,5 @@ export async function GET(request: Request) {
  * totals on the server (/api/account).
  */
 function forApp(state: AppState): AppState {
-  return { ...state, instance: { ...instanceInfo(), observeOnly: process.env.BOPS_COMPUTER_OBSERVE_ONLY === "1" }, usage: undefined, bots: state.bots.map((b) => ({ ...b, appsKey: undefined })) };
+  return { ...state, instance: { ...instanceInfo(), observeOnly: process.env.BOPS_COMPUTER_OBSERVE_ONLY === "1", secrets: secretStore() }, usage: undefined, bots: state.bots.map((b) => ({ ...b, appsKey: undefined })) };
 }

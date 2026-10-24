@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useContext, useState } from "react";
 import type { AppState, BotId, VaultLogin } from "@/lib/types";
 import { AppsSection } from "./apps";
 import { Mascot } from "./mascot";
 import { KeyIcon } from "./screen-cards";
-import { ago, post, teamOf } from "./ui";
+import { ago, post, SecretsHome, teamOf } from "./ui";
 
 /*
  * The vault: everything your bots can get into, in one place. Apps (any of Composio's catalog, several
@@ -16,6 +16,7 @@ import { ago, post, teamOf } from "./ui";
 
 export function VaultTab({ state }: { state: AppState }) {
   const logins = [...(state.vault ?? [])].sort((a, b) => a.site.localeCompare(b.site));
+  const keptIn = useContext(SecretsHome);
   const [editing, setEditing] = useState<string | "new" | null>(null);
 
   return (
@@ -36,7 +37,7 @@ export function VaultTab({ state }: { state: AppState }) {
         <div className="flex items-end justify-between gap-3 pt-2">
           <div className="flex flex-col gap-0.5">
             <span className="text-[15px] font-semibold leading-5">Logins</span>
-            <span className="text-[12.5px] leading-[17px] text-[#6B6B6B]">Passwords and 2FA keys stay in your Mac&apos;s Keychain and go straight into the sign-in page. No AI ever sees them.</span>
+            <span className="text-[12.5px] leading-[17px] text-[#6B6B6B]">Passwords and 2FA keys stay in {keptIn} and go straight into the sign-in page. No AI ever sees them.</span>
           </div>
           {editing !== "new" && (
             <button onClick={() => setEditing("new")} className="shrink-0 rounded-full bg-ink px-3.5 py-2 text-[13px] font-semibold leading-4 text-white">
@@ -130,6 +131,7 @@ function Badge({ children }: { children: React.ReactNode }) {
 function LoginForm({ state, login, onDone }: { state: AppState; login?: VaultLogin; onDone: () => void }) {
   const [site, setSite] = useState(login?.site ?? "");
   const [username, setUsername] = useState(login?.username ?? "");
+  const keptIn = useContext(SecretsHome);
   const [password, setPassword] = useState("");
   const [totp, setTotp] = useState("");
   const [bots, setBots] = useState<VaultLogin["bots"]>(login?.bots ?? "all");
@@ -226,7 +228,7 @@ function LoginForm({ state, login, onDone }: { state: AppState; login?: VaultLog
           Cancel
         </button>
         <span className="flex-1" />
-        <span className="text-[11.5px] leading-4 text-[#9A9A98]">Stored in your Mac&apos;s Keychain</span>
+        <span className="text-[11.5px] leading-4 text-[#9A9A98]">Stored in {keptIn}</span>
       </div>
     </form>
   );
