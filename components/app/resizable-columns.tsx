@@ -1,13 +1,28 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { useRememberedState } from "./use-remembered-state";
 
 const defaults = { sidebar: 340, chat: 440 };
 const clamp = (n: number, min: number, max: number) => Math.min(Math.max(n, min), max);
 
-/** Own the layout state here so dragging does not rerender chat and live-screen children. */
-export function ResizableColumns({ three, children }: { three: boolean; children: ReactNode }) {
+const PHONE = "(max-width: 699px)";
+
+/** Whether the window is phone-sized: then the app shows one column at a time instead of side by side. */
+export function usePhone() {
+  return useSyncExternalStore(
+    (changed) => {
+      const query = matchMedia(PHONE);
+      query.addEventListener("change", changed);
+      return () => query.removeEventListener("change", changed);
+    },
+    () => matchMedia(PHONE).matches,
+    () => false,
+  );
+}
+
+/** Own the layout state here so dragging does not rerender chat and live-screen children. On a phone it's one column, without handles. */
+export function ResizableColumns({ three, phone, children }: { three: boolean; phone: boolean; children: ReactNode }) {
   const root = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(1200);
   const [saved, setSaved] = useRememberedState("bops:column-widths", defaults);
@@ -26,10 +41,12 @@ export function ResizableColumns({ three, children }: { three: boolean; children
   const maxChat = Math.max(minChat, width - sidebar - minComputer);
   const chat = clamp(Number.isFinite(saved?.chat) ? saved.chat : defaults.chat, minChat, maxChat);
   const change = (column: "sidebar" | "chat", value: number) => setSaved(old => ({ ...old, [column]: clamp(value, column === "sidebar" ? minSidebar : minChat, column === "sidebar" ? maxSidebar : maxChat) }));
-  return <div ref={root} className="relative flex h-screen min-w-0 flex-col overflow-hidden bg-white font-sans text-ink antialiased" style={{ "--bops-columns": three ? `${sidebar}px ${chat}px minmax(0,1fr)` : `${sidebar}px minmax(0,1fr)` } as CSSProperties}>
+  const columns = phone ? "minmax(0,1fr)" : three ? `${sidebar}px ${chat}px minmax(0,1fr)` : `${sidebar}px minmax(0,1fr)`;
+  // h-dvh, not h-screen: a phone's browser bars would otherwise hide the bottom of the app (the composer).
+  return <div ref={root} className="relative flex h-dvh min-w-0 flex-col overflow-hidden bg-white font-sans text-ink antialiased" style={{ "--bops-columns": columns } as CSSProperties}>
     {children}
-    <ResizeHandle column="sidebar" left={sidebar} value={sidebar} min={minSidebar} max={maxSidebar} onChange={change} />
-    {three && <ResizeHandle column="chat" left={sidebar + chat} value={chat} min={minChat} max={maxChat} onChange={change} />}
+    {!phone && <ResizeHandle column="sidebar" left={sidebar} value={sidebar} min={minSidebar} max={maxSidebar} onChange={change} />}
+    {!phone && three && <ResizeHandle column="chat" left={sidebar + chat} value={chat} min={minChat} max={maxChat} onChange={change} />}
   </div>;
 }
 

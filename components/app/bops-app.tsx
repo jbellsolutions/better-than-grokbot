@@ -6,13 +6,17 @@ import { botChatId, live, sharesComputer, workBot, type AppState, type Host, typ
 import { Account } from "./account";
 import { UpdateStatus } from "./update-status";
 import { ModelSettings } from "./model-settings";
-import { ResizableColumns } from "./resizable-columns";
+import { ResizableColumns, usePhone } from "./resizable-columns";
 import { BotPanel, type Section } from "./bot-panel";
 import { CallBar } from "./call-bar";
 import { ChatView, ThreadSheet, ToPicker } from "./chat-view";
 import { ComputerPeek, ComputerView, defaultDisplay } from "./computer";
 import { BusyBots, Mascot } from "./mascot";
 import { CHAT_TAB, hostOf, NewTab, OpenLink, TabBar, WebTab, type PanelTab } from "./panel-tabs";
+
+/** A phone's screens, from the list in: the list of chats (the sidebar), a chat, and the side panel. */
+type PhoneScreen = "list" | "chat" | "panel";
+const PHONE_SCREENS: PhoneScreen[] = ["list", "chat", "panel"];
 
 /** The tabs open from the start besides the computer: your Mac, and the chat's bot's profile. */
 const MAC_TAB = "tab_mac";
@@ -26,7 +30,7 @@ import { VaultTab } from "./vault";
 import { MacPreviews } from "./mac-tab";
 import { OPEN_MAC_KEY } from "./mac-pip";
 import { MacComputer } from "./mac-computer";
-import { chatInWorkspace, post, teamOf, useAppState } from "./ui";
+import { chatInWorkspace, post, SecretsHome, secretsHome, teamOf, useAppState } from "./ui";
 import { OwnerEmail, useOwnerEmailInfo } from "./owner-email";
 import { OwnerPhone, useOwnerPhone, usePhoneInfo, type OwnerNumber, type PendingCode } from "./owner-phone";
 import { LineLink } from "./line-link";
@@ -83,7 +87,33 @@ function Bops({ state }: { state: AppState | null }) {
   const [chatId, setChatId] = useRememberedState("bops:chat", "");
   const [threadId, setThreadId] = useRememberedState<string | null>("bops:thread", null);
   const [composing, setComposing] = useState(false);
-  const [panelOpen, setPanelOpen] = useState(true);
+  const phone = usePhone();
+  const [panelWanted, setPanelWanted] = useState(true);
+  // A phone shows one screen at a time: the list (the sidebar), a chat, or the side panel (a computer,
+  // a profile, a page). There the panel is "open" while it's the screen showing.
+  const [phoneScreen, setPhoneScreen] = useState<PhoneScreen>("chat");
+  const panelOpen = phone ? phoneScreen === "panel" : panelWanted;
+  const setPanelOpen = (open: boolean) => (phone ? setPhoneScreen(open ? "panel" : "chat") : setPanelWanted(open));
+  // Each phone screen is a history entry, so the back gesture goes back a screen instead of leaving the
+  // app. Screens change only through phoneScreen; this keeps the history in step (deeper pushes, back
+  // goes back). Next's router keeps our field in its entries (it copies custom history state).
+  useEffect(() => {
+    if (!phone) return;
+    const onPop = (e: PopStateEvent) => setPhoneScreen((e.state as { bopsScreen?: PhoneScreen } | null)?.bopsScreen ?? "list");
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [phone]);
+  useEffect(() => {
+    if (!phone) return;
+    const at = (history.state as { bopsScreen?: PhoneScreen } | null)?.bopsScreen;
+    if (at === phoneScreen) return;
+    // The first screen gets the ones before it underneath, so back has somewhere to go.
+    if (!at) history.replaceState({ ...history.state, bopsScreen: "list" }, "");
+    const from = PHONE_SCREENS.indexOf(at ?? "list");
+    const to = PHONE_SCREENS.indexOf(phoneScreen);
+    if (to < from) history.go(to - from);
+    else for (const screen of PHONE_SCREENS.slice(from + 1, to + 1)) history.pushState({ ...history.state, bopsScreen: screen }, "");
+  }, [phone, phoneScreen]);
   const [focus, setFocus] = useState(false);
   // Full width shows your Mac instead of a bot's computer.
   const [macFocus, setMacFocus] = useState(false);
@@ -213,6 +243,8 @@ function Bops({ state }: { state: AppState | null }) {
   }, [setThreadId]);
 
   if (!state) return <div className="flex h-screen items-center justify-center text-pencil">Loading Better than GrokBot…</div>;
+  // A phone that leaves the side panel (the back gesture) leaves its full-screen computer too.
+  if (phone && focus && phoneScreen !== "panel") setFocus(false);
 
   // Stay inside the workspace you're in: a chat from another one falls back to this one's main bot.
   const team = teamOf(state);
@@ -337,7 +369,7 @@ function Bops({ state }: { state: AppState | null }) {
     const alerting = (state.watches ?? []).filter((w) => w.alert && (w.alert.level ?? "now") === "now" && team.some((b) => b.id === w.botId));
     if (cutAlerts === null) return setCutAlerts(new Set(alerting.map(key)));
     const fresh = alerting.find((w) => !cutAlerts.has(key(w)));
-    if (!fresh || document.hidden || focus || tab?.kind === "web" || tab?.kind === "vault") return;
+    if (!fresh || phone || document.hidden || focus || tab?.kind === "web" || tab?.kind === "vault") return;
     const el = document.activeElement as HTMLInputElement | null;
     if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable) && (el.value ?? el.textContent ?? "").trim()) return;
     setCutAlerts(new Set([...cutAlerts, key(fresh)]));
@@ -356,7 +388,9 @@ function Bops({ state }: { state: AppState | null }) {
     setComposing(false);
     setFocus(false);
     setActive(CHAT_TAB);
-    requestAnimationFrame(() => document.getElementById("composer")?.focus());
+    if (phone) setPhoneScreen("chat");
+    // Not on a phone: its keyboard would open over the chat.
+    else requestAnimationFrame(() => document.getElementById("composer")?.focus());
   };
   const openThread = (s: Session) => {
     const inView = s.chatId === chat.id || chat.botIds.includes(s.botId);
@@ -364,6 +398,7 @@ function Bops({ state }: { state: AppState | null }) {
     setComposing(false);
     setFocus(false);
     setThreadId(s.id);
+    if (phone) setPhoneScreen("chat");
     // A thread on your Mac shows your Mac; one in the cloud, the bot's computer.
     if (s.runsOn === "mac") {
       if (!openTabs.some((t) => t.id === MAC_TAB)) setTabs([...openTabs, { id: MAC_TAB, kind: "mac" }]);
@@ -397,6 +432,15 @@ function Bops({ state }: { state: AppState | null }) {
         onCall={setCall}
         callSlot={setCallSlot}
       />
+      {phone && (
+        <button
+          onClick={() => setPhoneScreen("list")}
+          aria-label="All chats"
+          className="absolute left-3 top-[18px] z-10 flex size-11 items-center justify-center rounded-full bg-white shadow-[0_0_0_1px_#E6E6E3,0_8px_20px_-10px_#00000040]"
+        >
+          <BackIcon />
+        </button>
+      )}
       {thread && (
         <ThreadSheet
           state={state}
@@ -414,7 +458,7 @@ function Bops({ state }: { state: AppState | null }) {
   const callBot = call ? state.bots.find((b) => b.id === call) : undefined;
   const callHere = !!callBot && !composing && !focus && !!callSlot && chat.kind === "bot" && chat.botIds[0] === callBot.id;
   const tabBar = (panelOpen || focus) && (
-    <TabBar state={state} tabs={tabs} active={focus ? CHAT_TAB : active} chatBotId={chatBotId} onPick={pickTab} onClose={closeTab} onNew={() => openTab(() => false, () => ({ id: tabId(), kind: "new" }))} />
+    <TabBar state={state} tabs={tabs} active={focus ? CHAT_TAB : active} chatBotId={chatBotId} onPick={pickTab} onClose={closeTab} onNew={() => openTab(() => false, () => ({ id: tabId(), kind: "new" }))} compact={phone} />
   );
 
   // Bots at work open their eyes (every mascot reads this): a running thread, typing, or on a call.
@@ -423,11 +467,34 @@ function Bops({ state }: { state: AppState | null }) {
   return (
     <BusyBots.Provider value={busy}>
     <OpenLink.Provider value={openWeb}>
+    <SecretsHome.Provider value={secretsHome(state)}>
       <TooltipLayer />
-      <ResizableColumns three={!focus && panelOpen}>
-        <TitleBar wide={focus || !panelOpen} tabs={tabBar} panelOpen={panelOpen && !focus} onTogglePanel={() => (focus ? setFocus(false) : setPanelOpen(!panelOpen))} />
+      <ResizableColumns three={!focus && panelOpen} phone={phone}>
+        {!phone ? (
+          <TitleBar wide={focus || !panelOpen} tabs={tabBar} panelOpen={panelOpen && !focus} onTogglePanel={() => (focus ? setFocus(false) : setPanelOpen(!panelOpen))} />
+        ) : (
+          panelOpen && !focus && <PhoneBar tabs={tabBar} onBack={() => setPhoneScreen("chat")} />
+        )}
         <div className="grid min-h-0 flex-1" style={{ gridTemplateColumns: "var(--bops-columns)" }}>
-          <Sidebar state={state} chatId={chat.id} onOpenChat={openChat} onOpenThread={openThread} onCompose={() => setComposing(true)} onSettings={() => setSettings(true)} onAccount={() => setAccount(true)} onSetup={() => setSetup(true)} onVault={openVault} onBusiness={openBusiness} onOpenWatch={showWatch} />
+          {/* "contents" keeps these wrappers out of the grid; on a phone they hide the screens not showing. */}
+          <div className={phone && phoneScreen !== "list" ? "hidden" : "contents"}>
+            <Sidebar
+              state={state}
+              chatId={chat.id}
+              onOpenChat={openChat}
+              onOpenThread={openThread}
+              onCompose={() => {
+                setComposing(true);
+                if (phone) setPhoneScreen("chat");
+              }}
+              onSettings={() => setSettings(true)}
+              onAccount={() => setAccount(true)}
+              onSetup={() => setSetup(true)}
+              onVault={openVault}
+              onBusiness={openBusiness}
+              onOpenWatch={showWatch}
+            />
+          </div>
           {focus && macFocus ? (
             <div className="flex min-h-0 min-w-0 flex-col bg-white">
               <MacComputer state={state} mode="focus" onBack={() => setFocus(false)} onOpenThread={openThread} />
@@ -448,7 +515,7 @@ function Bops({ state }: { state: AppState | null }) {
             </div>
           ) : (
             <>
-              {chatColumn}
+              <div className={phone && phoneScreen !== "chat" ? "hidden" : "contents"}>{chatColumn}</div>
               {panelOpen && (
                 <section className="relative flex min-h-0 min-w-0 flex-col bg-white">
                   {cutBack && (
@@ -562,8 +629,9 @@ function Bops({ state }: { state: AppState | null }) {
         )}
         {setup && <Setup state={state} onClose={() => setSetup(false)} />}
         {/* What bots are doing on the user's Mac, live, in the corner (hidden while the Your Mac tab is open). */}
-        {!(tab?.kind === "mac" && panelOpen) && <MacPreviews state={state} onOpen={openMac} />}
+        {!phone && !(tab?.kind === "mac" && panelOpen) && <MacPreviews state={state} onOpen={openMac} />}
       </ResizableColumns>
+    </SecretsHome.Provider>
     </OpenLink.Provider>
     </BusyBots.Provider>
   );
@@ -593,6 +661,26 @@ function TitleBar({ wide, tabs, panelOpen, onTogglePanel }: { wide: boolean; tab
         </button>
       </div>
     </div>
+  );
+}
+
+/** A phone's bar over the side panel: back to the chat, and the panel's tabs. */
+function PhoneBar({ tabs, onBack }: { tabs: React.ReactNode; onBack: () => void }) {
+  return (
+    <div className="flex h-12 shrink-0 items-center gap-1 border-b border-[#ECECEA] bg-[#F7F7F6] pl-1 pr-2">
+      <button onClick={onBack} aria-label="Back to the chat" title="Back to the chat" className="flex size-9 shrink-0 items-center justify-center rounded-lg active:bg-[#EEEEEC]">
+        <BackIcon />
+      </button>
+      {tabs}
+    </div>
+  );
+}
+
+function BackIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0A0A0A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M15 5l-7 7 7 7" />
+    </svg>
   );
 }
 
@@ -849,16 +937,16 @@ function OwnerSettings({ owner }: { owner: AppState["owner"] }) {
     <div className="flex flex-col gap-2 px-[22px] pt-[18px]">
       <span className="text-[13px] font-semibold">You</span>
       <div className="flex flex-col gap-2.5 rounded-[14px] p-3.5 shadow-[0_0_0_1px_#E6E6E3]">
-        <label className="flex items-center gap-3">
+        <label className="flex items-center gap-3 max-[700px]:flex-col max-[700px]:items-stretch max-[700px]:gap-1.5">
           <span className="w-[120px] text-[13px] font-medium">Your name</span>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="What your bots call you"
-            className="h-8 w-[260px] rounded-full bg-[#F7F7F6] px-3 text-[13px] outline-none shadow-[0_0_0_1px_#E6E6E3] focus:shadow-[0_0_0_1.5px_#0A0A0A]"
+            className="h-8 w-[260px] rounded-full bg-[#F7F7F6] px-3 text-[13px] outline-none shadow-[0_0_0_1px_#E6E6E3] focus:shadow-[0_0_0_1.5px_#0A0A0A] max-[700px]:w-full"
           />
         </label>
-        <label className="flex items-start gap-3">
+        <label className="flex items-start gap-3 max-[700px]:flex-col max-[700px]:items-stretch max-[700px]:gap-1.5">
           <span className="w-[120px] pt-1.5 text-[13px] font-medium">About you</span>
           <textarea
             value={about}
@@ -868,7 +956,7 @@ function OwnerSettings({ owner }: { owner: AppState["owner"] }) {
             className="flex-1 resize-none rounded-[12px] bg-[#F7F7F6] px-3 py-1.5 text-[13px] leading-[18px] outline-none shadow-[0_0_0_1px_#E6E6E3] focus:shadow-[0_0_0_1.5px_#0A0A0A]"
           />
         </label>
-        <div className="flex items-center gap-2 pl-[132px]">
+        <div className="flex items-center gap-2 pl-[132px] max-[700px]:pl-0">
           <button disabled={!changed || !name.trim()} onClick={() => void save()} className="rounded-full bg-ink px-3 py-1.5 text-[12.5px] font-medium leading-4 text-white disabled:opacity-40">
             Save
           </button>
@@ -957,7 +1045,7 @@ function Settings({ state, onClose }: { state: AppState; onClose: () => void }) 
   const selfHosted = useSelfHosted();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-[2px]" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="flex max-h-[90vh] w-[760px] flex-col overflow-y-auto rounded-[22px] bg-white shadow-[0_0_0_1px_#0000000F,0_30px_70px_-28px_#00000038]">
+      <div onClick={(e) => e.stopPropagation()} className="flex max-h-[90vh] w-[760px] max-w-[calc(100vw-24px)] flex-col overflow-y-auto rounded-[22px] bg-white shadow-[0_0_0_1px_#0000000F,0_30px_70px_-28px_#00000038]">
         <div className="flex items-center justify-between border-b border-[#F0F0EE] px-[22px] py-[18px]">
           <div className="flex flex-col gap-0.5">
             <span className="text-[18px] font-semibold leading-[22px]">Settings</span>

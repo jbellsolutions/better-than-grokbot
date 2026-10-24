@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -15,7 +15,12 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Better than GrokBot",
   description: "AI coworkers with their own computers.",
+  // Added to a phone's home screen, it opens full screen like an app.
+  appleWebApp: { capable: true, title: "Better than GrokBot", statusBarStyle: "default" },
+  icons: { apple: "/apple-touch-icon.png" },
 };
+
+export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#F7F7F6" };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (

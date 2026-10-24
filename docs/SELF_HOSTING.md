@@ -1,0 +1,305 @@
+# Running Better than GrokBot: the full guide
+
+The [README](../README.md) gets you started. This page covers everything else: the Mac app, keeping it
+running, recovery, extra teams, models and computers. Most of it is macOS-only; the [README's platform table](../README.md#where-it-runs) says what works where.
+
+## Requirements
+
+
+- macOS on Apple Silicon, Node 24 or newer.
+- **Required:** an OpenRouter or OpenAI API key, and an Orgo API key: self-hosted, the app opens only with one, and the bots' computers run on your Orgo account.
+- **Recommended:** Typesafe (small judgment calls), Honcho (memory), Composio (apps), AgentMail (email), Tailscale (direct live view of the bots' screens).
+- **Optional:** AgentPhone plus a public URL for texts and calls (see `edge/`).
+- **For "Your Mac":** the Codex CLI signed in with ChatGPT (with computer use), and `cua-driver` (default `~/.local/bin/cua-driver`). macOS asks for Screen Recording and Accessibility.
+
+## Self-host it in detail
+
+This fork is named **Better than GrokBot**. Its settings keep Bops' names (`BOPS_*`, the `ai.orgo.bops.selfhosted` bundle and service IDs, `~/Library/Application Support/Bops Self-Hosted`), so state and credentials from a Bops install carry over.
+
+
+```bash
+npm install
+cp .env.example .env.local   # then: node scripts/set-key.cjs OPENROUTER_API_KEY (or OPENAI_API_KEY), and ORGO_API_KEY
+npm run app                  # opens Bops.app, which starts the server on port 3210
+```
+
+Or run the server alone with `npx next dev --port 3210` and open http://localhost:3210.
+
+The app opens on **Sign in with Orgo**: approve the code on orgo.ai, and Bops runs on your Orgo account. Self-hosters with `BOPS_SELF_HOSTED=1` and `ORGO_API_KEY` skip this.
+
+Then open **Settings → You** and add your name and a line about yourself: every bot uses it.
+
+The app is designed for hosted Bops, where every service is run for the user, so Settings shows only what's theirs to set. Signed in with Orgo, the app reaches every service through Bops Cloud (`cloud/README.md`) on the user's Orgo key, so no provider keys sit on the Mac. `BOPS_SELF_HOSTED=1` (on in `.env.example`) calls each service directly with the keys in `.env.local` instead, and adds a Self-hosting section: network, email domain, phone service and computer ids.
+
+### OpenRouter with local Codex
+
+This checkout also supports OpenRouter for self-hosted text chat and Orgo tasks. Keep
+`BOPS_SELF_HOSTED=1`, set `OPENROUTER_API_KEY` in `.env.local`, and set the following model IDs:
+
+```dotenv
+BOPS_CHAT_MODEL=z-ai/glm-5.3-flash
+BOPS_SESSION_MODEL=z-ai/glm-5.3-flash
+BOPS_HARD_MODEL=z-ai/glm-5.3-flash
+```
+
+The cloud model must support tools and image inputs. Inference goes to OpenRouter; browser,
+screen and shell tools execute on Orgo. The model key stays on the Mac. Mac tasks still use
+your ChatGPT-signed-in Codex. No OpenAI executor key is needed for OpenRouter tasks.
+Up to four cloud tasks share the computer's four screens; each task runs its own model/tool loop
+sequentially, without helper agents. Bot profiles and chats persist in `.data/state.json`, and
+cloud task conversation history persists in `.data/openrouter/`. Active tasks interrupted by an
+app restart are marked failed and can be continued from their saved history. Voice/phone calls
+still require the original providers; this configuration is for text and computer tasks.
+
+To reuse an existing **Bops-ready** computer, set `BOPS_ORGO_COMPUTER_ID` to its UUID. Bops won't
+delete, reset, or resize that computer. Ordinary Orgo desktops need the Bops template's browser,
+Python environment, and desktop tools first. Don't repurpose a computer with active agent tasks.
+
+Run `npm run app:fast` for the production build and desktop app (no development compilation while
+using it). Keep the app and its server running on your Mac: an always-on Orgo desktop alone does
+not keep the local coordinator working when your Mac sleeps. OpenRouter charges usage separately
+from your Orgo computer and ChatGPT plan. Tests: `node --test test/openrouter.test.cjs`.
+
+For a native Mac app, run `npm run app:build`. The app in `dist-desktop/mac-arm64/` starts the
+production server from this checkout and uses the same settings and saved team. Keep this project
+folder in place when using that app. Provider keys remain in the project's ignored `.env.local`.
+
+The always-on Mac setup uses the login service `ai.orgo.bops.selfhosted.server`. It starts at sign-in,
+restarts the coordinator if it exits, and prevents system sleep while allowing the display to sleep.
+With `.data/service.json` present, Electron connects to that service and never owns or stops it.
+Chats and tasks continue when a desktop window or browser tab closes. The Mac must stay powered on,
+online, and signed in; tasks interrupted by a server restart still need continuation.
+
+The browser address is stored in `.data/service.json`. Tailscale Serve forwards HTTPS to the
+loopback-only coordinator. Set `BOPS_PUBLIC_HOST` and `BOPS_TAILSCALE_USER` to the private hostname
+and owner's Tailscale login; other identities are refused. Electron's live Mac screen previews
+remain native-app features. The browser manages chats, cloud work, and Mac tasks.
+
+Service logs: `~/Library/Logs/Bops/background.log` and `background-error.log`. After editing the
+web UI or backend, stop the service, build, then start it again:
+
+```bash
+launchctl bootout "gui/$(id -u)/ai.orgo.bops.selfhosted.server"
+npm run build
+launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/ai.orgo.bops.selfhosted.server.plist"
+```
+
+Changes to `desktop/main.cjs` or its preload also need a new native app build:
+
+```bash
+npm run app:install
+```
+
+The installer checks for active tasks, stops the service while building, restores it even if the build
+fails, and replaces only `Better than GrokBot.app`. The original `Bops.app` is preserved. To disable the
+always-on setup, boot out the service, remove its LaunchAgent plist and `.data/service.json`, and
+disable only Bops' Serve port with `tailscale serve --https=8443 off`.
+
+### The bots' computers
+
+Bot computers launch from an Orgo template built from this repo: `node orgo/bops-base.mjs publish`. Set `BOPS_ORGO_TEMPLATE` to your build's ref if the default isn't in your account. Bops keeps its computers in one Orgo workspace (the signed-in user's workspace named "bops", or `BOPS_ORGO_WORKSPACE` when self-hosting on `ORGO_API_KEY`) and never creates or deletes computers outside it.
+
+### Texts and calls (optional)
+
+1. Deploy `edge/` (see `edge/fly.toml`): it needs a Tailscale login and `BOPS_UPSTREAM` (your Mac's tailnet address, port 3210).
+2. Point AgentPhone's webhook and your OpenAI project's webhook (`live.transport.incoming`) at it: `/hooks/agentphone` and `/hooks/openai`.
+3. Set the `AGENTPHONE_*`, `BOPS_AGENTPHONE_HOOK_URL` and `OPENAI_WEBHOOK_SECRET` settings, then add your mobile in **Settings → How your bots reach you**.
+
+US texting needs an A2P 10DLC registration for your brand.
+
+### Agent profiles, connected apps, and account computers
+
+Open an agent’s **Details → Edit name and role** to change its name and working instructions.
+New tasks and conversations use the updated role; existing history stays with the same agent.
+**Message** opens the agent’s Bops chat. Dedicated email uses `AGENTMAIL_API_KEY`; connected app
+accounts use `COMPOSIO_API_KEY` and your app’s OAuth sign-in; long-term shared memory uses
+`HONCHO_API_KEY`. Chat and task history persist locally even without Honcho. Self-hosted mail
+uses AgentMail’s default domain unless `BOPS_MAIL_DOMAIN` specifies a domain you own.
+SMS/call numbers require AgentPhone separately. The upstream cloud phone device is unimplemented.
+
+In **Details → Orgo computer**, choose a running Linux computer from your Orgo account,
+then click **Use this computer**. A specialist can instead share the main agent’s computer.
+Switching the main agent also moves agents set to Shared. Other agents with explicit assignments
+stay on their selected computers. No new VM is created by this picker. Existing computers and
+files remain when you switch or delete an agent; Bops never deletes or resizes borrowed computers.
+Pause affected cloud tasks and stop screen watches before switching.
+
+On first use of a newly selected VM, Bops installs the repository’s Python MCP environment,
+Playwright MCP, screen helpers, and desktop utilities. This currently requires an Ubuntu-style
+Orgo root environment with Chrome, Node, npm, and at least 2 GB free. Existing software remains
+installed. Multiple agents assigned to the same VM share one screen ledger. Borrowed VMs keep
+their network identity; live preview falls back to Orgo screenshots unless a Bops tailnet path exists.
+
+macOS grants permissions separately to **Better than GrokBot**, the downloaded **Bops** app,
+and **Codex Computer Use**. Enable Screen Recording for the self-hosted app to show live Mac
+previews. Mac automation through Codex needs the Codex Computer Use helper’s own Accessibility
+and Screen Recording grants. Restart the affected app after granting Screen Recording.
+
+### Update notifications and recovery
+
+Run `npm run updates:enable` once on macOS. A separate login service checks hourly, independently
+of Electron and the browser. It watches this repository's main branch and latest GitHub release,
+plus the upstream Bops app's feed, `https://bops.bot/download/latest.json`.
+The first run establishes a baseline; subsequent changes produce a macOS notification (allow
+notifications for Script Editor/osascript if macOS asks). Current versions and release notes appear
+in **Settings → Updates** in both clients, even if system notifications are disabled. Checks resume
+after login/wake; no monitoring runs while the Mac is off. Server-only paid features without a
+manifest change cannot be detected from these public feeds. Nothing is automatically installed.
+
+Manual check: `npm run updates:check`. Logs: `~/Library/Logs/Bops/updates.log` and
+`updates-error.log`. Disable: `launchctl bootout "gui/$(id -u)/ai.orgo.bops.selfhosted.updates"`
+and remove only its matching plist in `~/Library/LaunchAgents/`.
+
+The checker also makes one private daily snapshot of saved team state and OpenRouter conversation
+history in `~/Library/Application Support/Bops Self-Hosted/backups/state-YYYY-MM-DD/`.
+These snapshots contain private account/task data; keep them private. They exclude provider dotenv
+files and are on the same Mac, so they do not protect against loss of the Mac. To restore, stop the
+background service first, preserve the current `.data/`, copy a chosen snapshot's `state.json` and
+`openrouter/` into it, then start the service. Keep `.env.local`, the macOS Keychain, and this source
+folder available; a Git checkpoint alone does not contain credentials or saved conversations.
+
+To update, commit your own changes, take `npm run checkpoint`, then `git pull` this repository on a
+branch, run `npm run test:selfhost`, typechecking and lint, and review the diff before merging and
+rebuilding (`npm run app:install`) while agents are idle. Keep the checkpoint for rollback. Dotenv
+keys, `.data`, chats and app binaries are git-ignored; never commit them.
+
+### A stopping point that can be recovered on another Mac
+
+After saving a clean Git commit, `npm run checkpoint` creates an **AES-256 encrypted recovery DMG**
+under `~/Library/Application Support/Bops Self-Hosted/backups/`. It contains Git history, an exact
+saved-state/history snapshot, provider dotenv settings, deployment configuration, and the portable
+app ZIP if present. It verifies the image and writes a SHA-256 checksum alongside it. The randomly
+generated recovery password is in a separate private file under `recovery-keys/`. Copy the DMG and
+checksum off this Mac; keep the key in a password manager or separate secure location. Losing this
+Mac before moving both to durable storage means losing this recovery point. Never share the personal
+recovery DMG or key with a teammate. Daily snapshots are local and do not include dotenv settings.
+
+On a replacement Apple-silicon Mac:
+
+1. Open the encrypted DMG in Finder using the matching recovery key. Copy its contents to a private
+   folder. Install Node 24, Git, and Tailscale if needed.
+2. Clone `source.bundle` into the desired project folder:
+   `git clone -b <your branch> /path/to/source.bundle better-than-grokbot`.
+   Enter it; copy `settings/.env*` into the project, then copy the checkpoint's `state.json` and
+   `openrouter/` and `models.json` (if present) into `.data/`. Keep them private. Do **not** restore `deployment/service.json`
+   yet; the deployment plists are references and contain paths from the previous Mac.
+3. Run `npm ci`, then `npm run app:build`, then `npm run service:enable`.
+   Copy `dist-desktop/mac-arm64/Better than GrokBot.app` into `/Applications/` with `ditto`, then open it.
+4. Sign into Orgo and Codex again as required. Authentication tokens/Keychain items are not exported.
+   Approve macOS permissions for the self-hosted app and Codex helper.
+5. Configure Tailscale Serve on port 8443, update `BOPS_PUBLIC_HOST` and `BOPS_TAILSCALE_USER` for
+   the replacement Mac/account, and restart the idle coordinator to load those settings. Run
+   `npm run updates:enable`. Keep the original upstream as a fetch-only remote if desired.
+6. Verify the team, chats, provider configuration, and assigned Orgo computer. The existing cloud VM
+   persists separately in Orgo; this DMG does not snapshot its filesystem or restore provider accounts.
+
+A source commit and saved-state snapshot are exact data checkpoints. macOS permissions, current
+authentication, external provider state, and interrupted running tasks cannot be restored exactly
+from Git; they must be reconnected or resumed.
+
+### Share the app with a teammate
+
+`npm run app:share` packages the existing production build into
+`dist-desktop/share/Better-Than-GrokBot-arm64.zip`, including setup instructions and the license.
+It removes the source-folder pointer and uses the bundled server; it contains no personal settings,
+state, or account assignment. A teammate supplies their own Orgo/OpenRouter keys and ChatGPT login
+for their own installation. This Apple-silicon test app is unsigned and not notarized; a
+Developer ID/notarized release is needed for normal low-friction distribution. The portable app
+owns its coordinator and must stay open; always-on services/private browser hosting require a
+separate deployment like this Mac's. Sharing the ZIP does not grant access to your existing team.
+
+For your teammate to work in **your existing team**, use controlled browser access to your coordinator
+with their own Tailscale identity. The current proxy allows only the configured owner's identity;
+it rejects other users. Adding an authorized teammate and deciding what access they get is a
+separate configuration/security decision. Do not share the owner's login or bypass that check.
+
+### Agent communication and model configuration
+
+Bots in the same Bops workspace can use `ask_teammate`; Better than GrokBot also has `hand_off` for task delegation.
+The coordinator stores their conversations and routes requests across computers. Sharing an Orgo
+computer alone does not establish communication, and this is Bops' internal messaging rather than
+a published standard A2A network endpoint. OpenRouter chat/cloud inference runs through the Mac's
+coordinator; tools run on Orgo. The model picker below now controls chat and cloud models.
+`BOPS_CHAT_MODEL`, `BOPS_SESSION_MODEL`, and `BOPS_HARD_MODEL` supply initial defaults before a
+selection is saved. Mac tasks use signed-in Codex.
+
+### Choose models independently of computers
+
+**Settings → Models and OpenRouter** shows connection status, the default model, a searchable live
+OpenRouter catalog, listed token rates, and links to manage keys and review usage. Each agent's
+**Details → model** can override the default for both its chat and cloud tasks; leave it on
+**Use team default** to follow future default changes. GLM 5.3 Flash remains the initial default.
+The catalog includes only advertised text-output, image-input, tool-capable interactive models;
+provider availability and task-specific reliability can still vary. Unsupported reasoning settings
+are omitted rather than requiring every model to accept GLM's parameters.
+
+Changes persist without editing dotenv files or restarting. Team defaults live in `.data/models.json`;
+agent overrides live in `.data/state.json`. Both are included in new checkpoints/daily snapshots.
+Changes are blocked while affected work is active; they apply to the next chat or task. Mac computer
+work remains on signed-in Codex. No API returns the OpenRouter key: the settings page receives only
+a configured flag. On this source-linked install, the key is in the ignored `.env.local`; use the
+secure credential form to replace it and restart the idle coordinator to load the new key.
+
+Selecting another Orgo computer keeps the Bops team, chat history, persisted cloud task history, and
+model preferences. The new computer supplies its own files, browser profiles, installed programs,
+and any separately running agents. Those other systems' conversations/memory are not automatically
+imported into Bops. Continuing an old task on a different computer retains its conversation but may
+refer to files or URLs that are only on the previous VM. Explicit context/file migration or integration
+with an existing Hermes/Grok agent is a separate operation.
+
+### Separate teams on one Mac
+
+Besides your main team, you can run separate teams, each with its own conversations, profiles,
+connections and port (3211 and up), each bound to an existing Orgo computer you choose:
+
+```bash
+node scripts/instances.cjs add sales-team "Sales Team" <orgo-computer-id> "Prospecting"
+npm run instances:enable     # start them now and at login
+npm run instances:status
+```
+
+Use the app's instance picker to switch between teams. A team's own settings go in
+`.data/instances/<id>/.env.local`; shared provider identities are not copied between teams.
+
+
+### Resize columns and manage profiles
+
+Drag either vertical divider to resize the workspace, chat and computer columns. The pointer
+changes to a horizontal resize cursor. Widths are remembered per browser origin/native instance.
+The dividers also support arrow keys (Shift for larger steps), Home/End and double-click to reset.
+Title-bar tabs stay aligned, and smaller windows clamp widths to keep the columns usable.
+
+Open an agent's **Details → Manage profile** to hide or delete it. Hidden profiles keep their
+history and existing work/schedules; **Hidden profiles** in the sidebar can show them again.
+The Business desk's Profiles view has the same management link and a Show hidden profiles option.
+The team lead stays visible and cannot be deleted. Deletion requires a second confirmation and
+removes that Bops profile's chat, tasks, routines and inboxes. Borrowed Orgo computers remain.
+Imported profiles record a removal marker so source reconciliation does not recreate them after
+restart.
+
+The registry gives each team a fixed loopback port. Rebuilding this checkout only restarts services whose LaunchAgent
+working directory points to this checkout; separately hosted instances are preserved.
+
+
+## Releasing a signed Mac app (maintainers)
+
+```bash
+scripts/release.sh          # or: npm run app:release
+```
+
+It fetches the `orgo-relay` agent (`scripts/fetch-relay.sh`, into `vendor/orgo-relay/`), builds the server (`next build`, `output: "standalone"`), and makes `dist-desktop/Better than GrokBot-<version>-arm64.dmg` and `.zip` (Apple silicon). The app carries the server in `Contents/Resources/server` and runs it with its own Node (no Node or source folder needed on the user's Mac); its state lives in `~/Library/Application Support/Bops/server/.data` and its log in `~/Library/Logs/Bops/server.log`. The relay agent ships as `Contents/Resources/bin/orgo-relay`. No `.env` file goes into the app; settings for one Mac can go in `~/Library/Application Support/Bops/.env.local`. Before finishing, the script starts the bundled server once as a fresh install would, with no keys and an empty home folder (port 3299), and checks that the page and the app's state answer. The bundled server listens on 127.0.0.1 only: bot computers' app calls and phone webhooks, which come over the tailnet, don't reach it unless that `.env.local` says `BOPS_LISTEN_ALL=1` (then `proxy.ts` lets other addresses reach only those paths). While it's loopback only, Orgo threads get no app tools.
+
+What a release needs:
+
+- **A Developer ID Application certificate** of the Apple Developer team, in the keychain, or as `CSC_LINK` (path or base64 of the .p12) plus `CSC_KEY_PASSWORD`; `CSC_NAME` picks one when there are several. An "Apple Development" certificate is not enough: only Developer ID apps run on other Macs outside the App Store.
+- **Notarization**, so Gatekeeper opens the app without a warning. electron-builder notarizes after signing when it finds, preferably, an App Store Connect API key: `APPLE_API_KEY` (path to the .p8), `APPLE_API_KEY_ID`, `APPLE_API_ISSUER`; or an Apple ID: `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`.
+
+Without a Developer ID certificate the script says so and builds unsigned, for testing on this Mac only (macOS also forgets Screen Recording and Microphone grants between unsigned builds).
+
+The app is signed with the hardened runtime and only two entitlements (`build/entitlements.mac.plist`): JIT, which Electron needs, and the microphone, for calls. Screen Recording and Accessibility have no entitlement: the user allows them in System Settings. Every binary inside, the relay included, is signed with the app.
+
+Why not the Mac App Store: its sandbox would stop Bops from running its own server and the relay, starting Codex and Chrome for the bots, and driving other apps for computer use.
+
+`npm run app:build` (and `app:install`) make a source-linked **Better than GrokBot** app that uses
+production `next start` from this folder, unsigned (`-c.mac.identity=null`, so electron-builder doesn't pick whatever Apple Development certificate is in the keychain). The release script pins signing to the Developer ID certificate and fails if anything else signed the app.
+

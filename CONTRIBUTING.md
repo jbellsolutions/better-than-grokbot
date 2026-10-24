@@ -5,12 +5,12 @@ Thanks for helping. A few things keep this smooth.
 ## Before you start
 
 - For anything bigger than a small fix, open an issue first so we can agree on the approach.
-- Security problems: [report them privately](https://github.com/nickvasilescu/bops/security/advisories/new), not in issues (see [SECURITY.md](SECURITY.md)).
+- Security problems: [report them privately](https://github.com/jbellsolutions/better-than-grokbot/security/advisories/new), not in issues (see [SECURITY.md](SECURITY.md)).
 - Be kind: we follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
-## Contributor License Agreement
+## License of contributions
 
-Bops is released under FSL-1.1-ALv2, and Organic Intelligence, Inc. also runs a hosted version. Before we merge your first pull request, we'll ask you to sign our CLA. You keep the copyright to your work.
+This fork is released under FSL-1.1-ALv2, like the Bops code it's based on. By opening a pull request you agree your change is released under the same license. You keep the copyright to your work. Changes that belong in Bops itself are better sent upstream to [OrgoAI/bops](https://github.com/OrgoAI/bops).
 
 ## Development
 

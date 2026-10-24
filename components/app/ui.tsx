@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { createContext, useEffect, useRef, useState } from "react";
 import { DISPLAYS, MAIN_WORKSPACE, workspaceOf, type AppState, type Bot, type Chat, type Logo, type Session } from "@/lib/types";
 import { Mascot, Spinner } from "./mascot";
 import { workStatus } from "@/lib/work-status";
@@ -13,6 +13,10 @@ const refreshers = new Set<() => Promise<void>>();
 const refreshState = () => Promise.all([...refreshers].map((f) => f()));
 
 /** Sends an action, then refreshes state before resolving, so the UI never shows the old world. */
+/** Where the server keeps saved passwords and tokens, in words (lib/server/keychain.ts). */
+export const SecretsHome = createContext("your Mac's Keychain");
+export const secretsHome = (state: AppState) => (state.instance?.secrets === "file" ? "a private file on this computer" : "your Mac's Keychain");
+
 export const post = async (url: string, body: unknown = {}, method = "POST") => {
   const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   await refreshState();

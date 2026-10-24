@@ -43,7 +43,12 @@ test('Mac access is denied for every fresh instance until its owner allows it; o
 
 test('Mac discovery finds an existing Codex beside version-managed Node when LaunchAgent PATH omits it', t => {
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'bops-codex-discovery-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));const nodeDir=path.join(root,'version-managed/bin');fs.mkdirSync(nodeDir,{recursive:true});const installed=path.join(nodeDir,'codex');fs.writeFileSync(installed,'fixture',{mode:0o700});
-  const cli=load('lib/server/codex-cli.ts',{'node:os':{homedir:()=>root}},{process:{env:{PATH:path.join(root,'empty')},execPath:path.join(nodeDir,'node')}});
+  // Only this fixture's executables exist, regardless of CLIs installed on the host.
+  const fixtureFs = { ...fs, accessSync(file, mode) {
+    if (!file.startsWith(root + path.sep)) throw Object.assign(new Error('Outside discovery fixture'), { code: 'ENOENT' });
+    return fs.accessSync(file, mode);
+  } };
+  const cli=load('lib/server/codex-cli.ts',{'node:os':{homedir:()=>root},'node:fs':fixtureFs},{process:{env:{PATH:path.join(root,'empty')},execPath:path.join(nodeDir,'node')}});
   assert.equal(cli.findCodex(),installed);fs.rmSync(installed);assert.equal(cli.findCodex(),undefined);
 });
 

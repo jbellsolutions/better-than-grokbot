@@ -350,3 +350,14 @@
     --chin: 0px;
   }
 }
+
+/* Phones zoom into a text field under 16px when it's tapped, and stay zoomed: keep fields at 16px there.
+   Outside any layer, so it wins over the text-[…] utilities. */
+@media (max-width: 699px) {
+  input,
+  textarea,
+  select,
+  [contenteditable="true"] {
+    font-size: 16px;
+  }
+}
