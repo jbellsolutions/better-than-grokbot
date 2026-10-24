@@ -14,5 +14,5 @@ Please don't open a public issue. Report it privately on GitHub: [**Report a vul
 ## How Bops is meant to be run
 
 - The server listens on your Mac (port 3210) and trusts requests from it. Don't expose that port to the internet. Only `/hooks/agentphone` and `/hooks/openai` should be public (through `edge/`), and both check signatures.
-- Provider keys live in `.env.local`; saved logins live in the Mac's Keychain. Neither is sent to the browser or to models.
+- Provider keys live in `.env.local`; saved logins and tokens live in the Mac's Keychain, or on Windows and Linux in `.data/secrets.json` (on Linux readable only by the user running the server; on Windows as private as the project folder, so keep it in the user's own folder). Neither is sent to the browser or to models.
 - Anyone on your Tailscale tailnet can reach the server: keep the tailnet to your own devices.

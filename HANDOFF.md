@@ -32,30 +32,33 @@ npm run build
 ```
 
 CI (`.github/workflows/ci.yml`) runs all of these on Linux, scans the whole history for secrets,
-and on Windows installs, builds and checks that the server answers.
+and on Windows installs, tests the secrets file, builds and checks that the server answers.
 
 ## Platforms, honestly
 
 - **Mac (Apple silicon):** everything. The native app (`npm run app:build`) is unsigned; a signed,
   notarized release needs an Apple Developer ID (see docs/SELF_HOSTING.md → Releasing). The
   `orgo-relay` helper for releases comes from a private upstream repo.
-- **Windows and Linux:** run the server and use the browser or the installed web app. Not working
-  there yet: Keychain secrets (`lib/server/keychain.ts` shells out to macOS `security`; Slack tokens
-  and the Vault use it), Mac computer use (Codex), the login services (`launchctl`), and the Electron
-  build (its packaged-server path uses symlinks and macOS paths in `desktop/main.cjs`).
-- **Phone:** installs from the browser over Tailscale (`app/manifest.ts`), but the UI is the desktop
-  three-column layout.
+- **Windows and Linux:** run the server and use the browser or the installed web app. Saved logins and
+  tokens go in `.data/secrets.json` instead of the Keychain (`lib/server/keychain.ts`, tested in
+  `test/secrets-file.test.cjs`, which CI also runs on Windows). Not working there yet: Mac computer
+  use (Codex), the login services (`launchctl`), and the Electron build (its packaged-server path uses
+  symlinks and macOS paths in `desktop/main.cjs`).
+- **Phone:** installs from the browser over Tailscale (`app/manifest.ts`). Below 700px wide the app
+  shows one screen at a time: the list, a chat, or the side panel (`phoneScreen` in
+  `components/app/bops-app.tsx`). Each screen is a history entry, so the back gesture goes back a
+  screen. Connecting an app opens its sign-in page on the computer; the phone gets an "Open sign-in
+  page" link in the Vault.
 
 ## Next, in order
 
-1. **Phone layout.** Below ~700px wide, show one column at a time: the agent list, then a chat with a
-   back button, and the computer as a full-screen sheet. The columns come from `--bops-columns` in
-   `components/app/resizable-columns.tsx` and the grid in `components/app/bops-app.tsx`. This turns the
-   home-screen app into a real phone app without a native build.
-2. **Keychain fallback for Windows/Linux.** Store secrets in a `chmod 600` file under `.data/` (or the
-   OS credential store) when `security` isn't there, so Slack and the Vault work off the Mac.
-3. **Windows desktop installer** (optional once 2 is done): an electron-builder `--win nsis` target,
-   with directory junctions or copies instead of symlinks in `packagedServer()`.
+1. **Phone notifications.** A closed phone app hears nothing from the bots. Web Push needs a service
+   worker and push keys; until then, texts (AgentPhone) or Slack reach the phone.
+2. **Always-on on Windows and Linux**, like `npm run service:enable` on a Mac: a Task Scheduler task or
+   a systemd user unit that runs `npm run serve`.
+3. **Windows desktop installer** (optional: the installed web app already gives a window and a
+   Start-menu icon): an electron-builder `--win nsis` target, with directory junctions or copies
+   instead of symlinks in `packagedServer()`.
 4. **Signed Mac release** under this fork's own name, bundle ID and Apple Developer account.
 
 ## Rules that keep it trustworthy

@@ -63,13 +63,15 @@ installed app, or your phone.
 | | What you get | How |
 |---|---|---|
 | **Mac** (Apple silicon) | Everything, including bots working in your Mac's own apps, the native app and the always-on service | Quick start, then optionally `npm run app:build` ([full guide](docs/SELF_HOSTING.md)) |
-| **Windows** | Chat, teams, the bots' cloud computers, models, connected apps, email | Quick start, then in Edge or Chrome: **⋯ → Apps → Install Better than GrokBot**. It gets its own window and Start-menu icon. |
+| **Windows** | Everything except working in your own computer's apps: chat, teams, the bots' cloud computers, models, connected apps, email, saved logins, Slack | Quick start, then in Edge or Chrome: **⋯ → Apps → Install Better than GrokBot**. It gets its own window and Start-menu icon. |
 | **Linux** | Same as Windows | Same as Windows |
-| **Phone** (iPhone, Android) | **Preview.** Installs to your home screen and connects, but the screen is still the desktop layout squeezed down; a real phone layout is next | See below |
+| **Phone** (iPhone, Android) | Your team in your pocket: chat with any bot, approve what they ask, watch their computers, change settings | See below |
 
 Mac-only for now: working in your own computer's apps (Codex computer use), the packaged desktop
-app, the always-on login service, and secrets saved to the Keychain (Slack tokens, the Vault). On
-Windows and Linux those parts don't work yet; everything else does.
+app, and the always-on login service. On a Mac, saved logins and tokens (the Vault, Slack) go in the
+Keychain; on Windows and Linux they go in `.data/secrets.json`, protected like the keys in
+`.env.local`: on Linux only your user can read it; on Windows it's as private as its folder, so keep the
+project inside your user folder.
 
 ### Use it on your phone
 
@@ -84,8 +86,10 @@ Your phone opens the app running on your computer, privately, through [Tailscale
 4. On the phone, open `https://my-mac.tail1234.ts.net:8443`, then **Share → Add to Home Screen**
    (iPhone, Safari) or **⋮ → Install app** (Android, Chrome).
 
-It opens full screen with its own icon. The computer must be on and running the app. For now the
-phone gets the desktop layout, so it's usable for a quick check-in but cramped.
+It opens full screen with its own icon and shows one screen at a time: your team, a chat, or a bot's
+computer. The back button (or Android's back gesture) goes back a screen. Connecting a new app (Gmail,
+Slack…) opens its sign-in page on the computer; on the phone, tap **Open sign-in page** in the Vault
+instead. The computer must be on and running the app.
 
 ## An AI team that gets work done
 
@@ -142,9 +146,9 @@ Intelligence sells the official hosted Bops at [bops.bot](https://bops.bot); tha
 
 ## Can I trust it?
 
-- **Your keys stay on your computer.** They live in `.env.local` (ignored by Git, `chmod 600`) and,
-  on a Mac, the Keychain. No API sends them to the browser or to a model; the settings page only sees
-  whether a key is set.
+- **Your keys stay on your computer.** They live in `.env.local` (ignored by Git, `chmod 600`). Saved
+  logins and tokens go in the Mac's Keychain, or `.data/secrets.json` on Windows and Linux
+  ([details](#where-it-runs)). No API sends them to the browser or to a model; the settings page only sees whether a key is set.
 - **Your data stays on your computer.** Chats, agents and task history are in `.data/`, also ignored by
   Git. Model calls go to the provider you chose; the bots' work runs on your own Orgo computers.
 - **Bots ask before they act.** Reading runs at once. Sending, posting, paying and deleting wait for your OK.
