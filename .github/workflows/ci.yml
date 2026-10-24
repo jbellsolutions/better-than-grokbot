@@ -50,7 +50,7 @@ jobs:
         shell: pwsh
         run: |
           $env:BOPS_SELF_HOSTED = "1"
-          $p = Start-Process -PassThru -NoNewWindow npx -ArgumentList "next","start","--port","3210","--hostname","127.0.0.1"
+          $p = Start-Process -PassThru -NoNewWindow node -ArgumentList "node_modules/next/dist/bin/next","start","--port","3210","--hostname","127.0.0.1"
           $ok = $false
           for ($i = 0; $i -lt 60 -and -not $ok; $i++) {
             Start-Sleep -Seconds 2
