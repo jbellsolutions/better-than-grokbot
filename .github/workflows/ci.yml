@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  # The Electron binary isn't needed to typecheck, test, lint or build the server.
+  ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Route types (next-env.d.ts isn't committed)
+        run: npx next typegen
+      - name: Typecheck
+        run: npx tsc --noEmit -p .
+      - name: Tests
+        run: npm run test:selfhost
+      - name: Lint
+        run: npm run lint
+      - name: Secret scan (whole history)
+        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:latest git /repo --redact --log-opts="--all"
+
+  # Windows runs the app in the browser (or installed from Edge/Chrome). This proves it installs, builds and answers.
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: The server starts and answers
+        shell: pwsh
+        run: |
+          $env:BOPS_SELF_HOSTED = "1"
+          $p = Start-Process -PassThru -NoNewWindow npx -ArgumentList "next","start","--port","3210","--hostname","127.0.0.1"
+          $ok = $false
+          for ($i = 0; $i -lt 60 -and -not $ok; $i++) {
+            Start-Sleep -Seconds 2
+            try { $r = Invoke-WebRequest -UseBasicParsing http://127.0.0.1:3210/api/health; $ok = $r.Content -match '"bops":true' } catch {}
+          }
+          Invoke-WebRequest -UseBasicParsing http://127.0.0.1:3210/manifest.webmanifest | Select-Object -ExpandProperty StatusCode
+          Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+          if (-not $ok) { throw "The server didn't answer /api/health" }

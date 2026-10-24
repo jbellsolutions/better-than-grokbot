@@ -8,6 +8,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "serve": "next start --port 3210 --hostname 127.0.0.1",
     "lint": "eslint",
     "app": "electron .",
     "app:fast": "npm run build && BOPS_APP_PRODUCTION=1 electron .",

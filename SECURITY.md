@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-Please don't open a public issue. Report it privately on GitHub: [**Report a vulnerability**](https://github.com/nickvasilescu/bops/security/advisories/new) (the Security tab of this repo). Tell us what you found, how to reproduce it, and what it lets someone do. We'll reply within 3 business days and keep you posted until it's fixed. Please give us a reasonable time to fix it before you share it.
+Please don't open a public issue. Report it privately on GitHub: [**Report a vulnerability**](https://github.com/jbellsolutions/better-than-grokbot/security/advisories/new) (the Security tab of this repo). Tell us what you found, how to reproduce it, and what it lets someone do. We'll reply as soon as we can and keep you posted until it's fixed. Please give us a reasonable time to fix it before you share it. If the problem is in upstream Bops code, report it to [OrgoAI/bops](https://github.com/OrgoAI/bops/security) too.
 
 ## What's in scope
 
