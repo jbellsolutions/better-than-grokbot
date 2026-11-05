@@ -189,7 +189,7 @@ async function main() {
       await new Promise(r => setTimeout(r, 500));
     }
     assert.ok(reply, 'Live Windows chat returned the expected reply');
-    await page.getByText('WINDOWS_CHAT_OK', { exact: true }).waitFor({ timeout: 10000 });
+    await page.getByRole('main').getByText('WINDOWS_CHAT_OK', { exact: true }).waitFor({ timeout: 10000 });
     await page.screenshot({ path: path.join(evidence, 'windows-live-chat.png') });
     checks.push('Live OpenRouter chat submitted through Windows UI and rendered the real model response');
     await page.getByRole('button', { name: 'New instance', exact: true }).click();
