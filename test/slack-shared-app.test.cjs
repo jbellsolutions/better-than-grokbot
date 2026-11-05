@@ -2,6 +2,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 const load = require('./helpers/load-ts.cjs');
 
 /**
@@ -14,7 +15,7 @@ const load = require('./helpers/load-ts.cjs');
  * - its bots post as "<name> · Bops" (or the team's name), never as just another agent's name.
  */
 
-const edge = () => import(path.resolve('edge/slack-route.mjs'));
+const edge = () => import(pathToFileURL(path.resolve('edge/slack-route.mjs')).href);
 const hash = code => crypto.createHash('sha256').update(code).digest('hex');
 const table = (instance, over = {}) => ({ instance, app: { team: 'T1', user: 'UBOPS', bot: 'BBOPS' }, teams: ['T1'], channels: [], owners: ['UOWNER'], codes: [], names: [], threads: [], talked: {}, ...over });
 const env = (event, over = {}) => ({ type: 'event_callback', team_id: 'T1', event_id: `Ev${Math.random()}`, event: { type: 'message', ts: '100.1', user: 'UOWNER', ...event }, ...over });

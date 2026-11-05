@@ -42,7 +42,7 @@ const install = fs.readFileSync('scripts/install-selfhost.cjs', 'utf8').replace(
 test('installer refuses busy tasks and restores the login service after build failure', async () => {
   const calls = [];
   let busy = true;
-  const context = { require: name => name === '../desktop/instances.cjs' ? { readRegistry: () => [] } : name === 'node:fs' ? { existsSync: p => !p.includes('build-rollback'), mkdtempSync: () => '/tmp/bops-build-rollback-test', realpathSync: p => p, cpSync: (...args) => calls.push(['backup-build', args]), rmSync: (...args) => calls.push(['remove-build', args]), renameSync: (...args) => calls.push(['restore-build', args]) } : name === 'node:child_process' ? { execFileSync: (cmd, args) => { if (cmd === '/usr/libexec/PlistBuddy') return '/project\n'; calls.push([cmd, args]); if (cmd === 'npm') throw Error('Build failed'); } } : require(name), __dirname: '/project/scripts', process: { platform: 'darwin', getuid: () => 501 }, fetch: async () => Response.json({ state: { sessions: busy ? [{ status: 'running' }] : [], chats: [{ typing: [] }] } }), AbortSignal, console };
+  const context = { require: name => name === 'node:path' ? path.posix : name === '../desktop/instances.cjs' ? { readRegistry: () => [] } : name === 'node:fs' ? { existsSync: p => !p.includes('build-rollback'), mkdtempSync: () => '/tmp/bops-build-rollback-test', realpathSync: p => p, cpSync: (...args) => calls.push(['backup-build', args]), rmSync: (...args) => calls.push(['remove-build', args]), renameSync: (...args) => calls.push(['restore-build', args]) } : name === 'node:child_process' ? { execFileSync: (cmd, args) => { if (cmd === '/usr/libexec/PlistBuddy') return '/project\n'; calls.push([cmd, args]); if (cmd === 'npm') throw Error('Build failed'); } } : require(name), __dirname: '/project/scripts', process: { platform: 'darwin', getuid: () => 501 }, fetch: async () => Response.json({ state: { sessions: busy ? [{ status: 'running' }] : [], chats: [{ typing: [] }] } }), AbortSignal, console };
   vm.runInNewContext(install, context);
   await assert.rejects(context.main(), /Wait until/); assert.equal(calls.length, 0);
   busy = false; await assert.rejects(context.main(), /Build failed/);
@@ -57,7 +57,7 @@ test('installer refuses busy tasks and restores the login service after build fa
 
 test('an installed app still opens when deleting the previous bundle fails', async () => {
   const calls = [], warnings = [];
-  const context = { require: name => name === '../desktop/instances.cjs' ? { readRegistry: () => [] } : name === 'node:fs' ? {
+  const context = { require: name => name === 'node:path' ? path.posix : name === '../desktop/instances.cjs' ? { readRegistry: () => [] } : name === 'node:fs' ? {
     existsSync: p => !p.includes('build-rollback'), mkdtempSync: () => '/tmp/bops-build-rollback-test', realpathSync: p => p, cpSync: () => {}, renameSync: () => {},
     rmSync: (p, options) => { if (p.includes('previous-')) { assert.equal(options.maxRetries, 10); throw Error('ENOTEMPTY'); } },
   } : name === 'node:child_process' ? { execFileSync: (cmd, args) => { calls.push([cmd,args]); if (cmd === '/usr/libexec/PlistBuddy') return args[1].includes('CFBundleIdentifier') ? 'ai.orgo.bops.selfhosted\n' : '/project\n'; } } : require(name),
