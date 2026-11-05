@@ -1,0 +1,50 @@
+name: Windows build and test
+on:
+  push:
+    branches: ['windows/**']
+  pull_request:
+    paths: ['windows/**', 'desktop/**', 'lib/**', 'app/**', 'package*.json', '.github/workflows/windows.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      BOPS_SELF_HOSTED: '1'
+      NEXT_TELEMETRY_DISABLED: '1'
+      CIRCLE_NODE_TOTAL: '2'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm ci --prefix cloud --no-audit --no-fund
+      - run: npm run test:windows
+      - run: npm run app:build:windows
+        id: build
+      - run: npx tsc --noEmit
+      - run: node --test --test-concurrency=2 test/*.test.cjs
+      - run: npm run lint
+      - name: Install and test the packaged Windows app
+        env:
+          WINDOWS_TEST_OPENROUTER_KEY: ${{ secrets.WINDOWS_TEST_OPENROUTER_KEY }}
+          WINDOWS_TEST_ORGO_KEY: ${{ secrets.WINDOWS_TEST_ORGO_KEY }}
+        run: node windows/smoke.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-test-evidence
+          path: windows/evidence/
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.build.outcome == 'success'
+        with:
+          name: Better-Than-GrokBot-Windows-x64
+          path: dist-desktop/*setup.exe
+          if-no-files-found: error

@@ -1,0 +1,4 @@
+# These files are shipped by Windows builds and executed on Linux bot computers.
+# Preserve Unix shebangs; text=auto leaves any future binary assets untouched.
+vm/** text=auto eol=lf
+scripts/*.sh text eol=lf

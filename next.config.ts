@@ -24,6 +24,7 @@ const excludedFiles = [
   "./site/**",
   "./types/**",
   "./vendor/**",
+  "./windows/**",
   "./node_modules/app-builder-lib/**",
   // Only next/image's optimizer loads these, and images are unoptimized (above).
   "./node_modules/sharp/**",

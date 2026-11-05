@@ -82,7 +82,7 @@ class Codex {
         this.login = undefined;
       });
       proc.on("error", () => {});
-      await this.request("initialize", { clientInfo: { name: "bops", title: "Bops", version: "0.1" }, capabilities: { experimentalApi: true, mcpServerOpenaiFormElicitation: true } }, 15_000);
+      await this.request("initialize", { clientInfo: { name: "bops", title: "Better Than GrokBot", version: "0.1" }, capabilities: { experimentalApi: true, mcpServerOpenaiFormElicitation: true } }, 15_000);
       this.send({ jsonrpc: "2.0", method: "initialized" });
     })();
     this.starting.catch(() => (this.starting = undefined));
@@ -176,7 +176,7 @@ class Codex {
     // Anything else Codex asks a client (more input, permissions, tokens) Bops doesn't do yet.
     if (m.method?.endsWith("requestApproval") || m.method === "execCommandApproval" || m.method === "applyPatchApproval") return this.respond(m.id!, { decision: "decline" });
     if (m.method === "mcpServer/elicitation/request" || m.method === "item/tool/requestUserInput") return this.respond(m.id!, { action: "decline", content: null });
-    this.send({ jsonrpc: "2.0", id: m.id, error: { code: -32601, message: "Bops can't do that" } });
+    this.send({ jsonrpc: "2.0", id: m.id, error: { code: -32601, message: "Better Than GrokBot can't do that" } });
   }
 
   /** The sign-in in the browser ended: look at the Mac again right away, so the setup card moves on. */
@@ -276,9 +276,9 @@ async function inspectMac() {
   let next: MacState["next"];
   let plan: string | undefined;
   const bin = findCodex();
-  if (!bin && !onTheMac()) {
+  if (!onTheMac()) {
     next = "elsewhere";
-    reason = "Computer use works in the Bops app on your Mac.";
+    reason = "Computer use works in the Better Than GrokBot app on your Mac.";
   } else if (!bin) {
     const failed = installStatus()?.state === "failed" ? installStatus()?.error : undefined;
     next = "codex";

@@ -7,7 +7,7 @@ test('legacy main agent becomes the branded Head of Ops without changing history
   const main = { id: 'boppy', name: 'Boppy', isMain: true, computerId: 'machine-1', instructions: 'Our charter', access: { docs: 'read' } };
   const state = { bots: [main, { id: 'bapi', name: 'Bapi', teamRole: 'operations' }], messages: [{ botId: 'boppy', text: 'Saved conversation' }], chats: [{ id: 'bot:boppy' }] };
   ensureTeamOperations(state);
-  assert.equal(main.name, 'Better than GrokBot'); assert.equal(main.role, 'Head of Ops · Orchestrator');
+  assert.equal(main.name, 'Better Than GrokBot'); assert.equal(main.role, 'Head of Ops · Orchestrator');
   assert.equal(main.computerId, 'machine-1'); assert.equal(main.instructions, 'Our charter'); assert.equal(main.access.docs, 'read');
   assert.equal(state.messages[0].text, 'Saved conversation'); assert.equal(state.chats[0].id, 'bot:boppy');
   assert.equal(state.bots[1].id, 'bapi'); assert.equal(state.bots[1].name, 'Operations Support'); assert.equal(state.bots[1].teamRole, 'specialist');

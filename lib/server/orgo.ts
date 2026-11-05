@@ -17,7 +17,7 @@ async function apiKey(): Promise<string> {
   const signedIn = await loadOrgoKey();
   if (signedIn) return signedIn;
   if (process.env.ORGO_API_KEY) return process.env.ORGO_API_KEY;
-  if (instanceId() !== "default") throw new Error("Connect Orgo for this instance in Settings.");
+  if (instanceId() !== "default" || process.env.BOPS_DISTRIBUTION === "better-than-grokbot") throw new Error("Connect Orgo for this instance in Settings.");
   try {
     const creds = JSON.parse(readFileSync(`${homedir()}/.orgo/credentials.json`, "utf8"));
     const key = creds.profiles[creds.current ?? "default"].apiKey;
@@ -93,7 +93,7 @@ export type OrgoComputer = { id: string; name: string; status: string; cpu: numb
  * The id is cached per server process; signIn() and signOut() clear the cache (orgo-auth.ts), so
  * the next user never lands in the last one's workspace.
  */
-const WORKSPACE = "bops";
+const WORKSPACE = "better-than-grokbot";
 type OrgoWorkspace = { id: string; name: string; role?: string };
 const g = globalThis as unknown as { bopsOrgoWorkspace?: Promise<string>; bopsComputerChanges?: number };
 
@@ -185,6 +185,7 @@ export const orgo = {
    * in their own "bops" workspace, from Orgo's Bops template; otherwise this is an ordinary create.
    */
   create: async (name: string, opts: { ram?: number; free?: boolean } = {}) => {
+    if (process.env.BOPS_DISTRIBUTION === "better-than-grokbot") throw Error("Choose your existing Orgo computer in Settings.");
     const c = await call<{ id: string; name: string; status: string }>("POST", "/computers", {
       workspace_id: await bopsWorkspace(),
       name,
@@ -224,11 +225,11 @@ export const orgo = {
    * computers made there before sign-in are Bops' too, when the account that signed in can reach them).
    */
   remove: async (computerId: string) => {
-    if (await borrowedComputer(computerId)) throw new Error("This is your existing Orgo computer. Bops cannot delete or reset it.");
+    if (await borrowedComputer(computerId)) throw new Error("This is your existing Orgo computer. Better Than GrokBot cannot delete or reset it.");
     const c = await call<{ project_id?: string; workspace_id?: string }>("GET", `/computers/${computerId}`);
     const where = c.workspace_id ?? c.project_id;
     if (where !== (await bopsWorkspace()) && (!where || where !== process.env.BOPS_ORGO_WORKSPACE))
-      throw new Error(`refusing to delete ${computerId}: not a Bops computer`);
+      throw new Error(`refusing to delete ${computerId}: not a Better Than GrokBot computer`);
     await call("DELETE", `/computers/${computerId}`);
     changed();
     recordUsage("computer.remove");

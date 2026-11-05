@@ -17,6 +17,7 @@ module.exports = function loadTs(file, mocks = {}, globals = {}) {
       if (Object.hasOwn(mocks, name)) return mocks[name];
       if (name.startsWith('@/') || name.startsWith('.')) {
         const resolved = name.startsWith('@/') ? path.resolve(name.slice(2)) : path.resolve(path.dirname(filename), name);
+        if (resolved.endsWith('.json') && fs.existsSync(resolved)) return require(resolved);
         if (fs.existsSync(resolved + '.ts')) return load(resolved + '.ts');
         if (fs.existsSync(resolved + '.json')) return require(resolved + '.json');
       }

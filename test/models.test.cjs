@@ -26,7 +26,8 @@ test('team model persists and agent overrides stay independent of computer selec
  await m.setModel('z-ai/glm-5.3-flash','scout');s.state.bots[1].computerId='different-vm';
  assert.equal(m.modelFor('chat','scout'),'z-ai/glm-5.3-flash');assert.equal(m.modelFor('session','scout'),'z-ai/glm-5.3-flash');
  await m.setModel(null,'scout');assert.equal(m.modelFor('session','scout'),'x-ai/grok-4.7');
- assert.equal(fs.statSync(path.join(s.root,'.data/models.json')).mode & 0o777,0o600);
+  // Windows exposes DOS attributes through stat.mode; Unix permission bits apply on POSIX.
+  if (process.platform !== 'win32')assert.equal(fs.statSync(path.join(s.root,'.data/models.json')).mode & 0o777,0o600);
 });
 test('model selection rejects unknown/incompatible models and changes during active work',async t=>{
  const s=setup(t),m=s.exports;

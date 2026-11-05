@@ -19,7 +19,7 @@ test('CLI tools receive JSON on stdin with fixed argv, are scoped to one agent, 
   const fixture = path.join(root, 'tool.cjs');
   fs.writeFileSync(fixture, "let input='';process.stdin.on('data',c=>input+=c);process.stdin.on('end',()=>{const args=JSON.parse(input);process.stdout.write(JSON.stringify({value:args.text,secret:process.env.FIXTURE_TOOL_TOKEN??null,argv:process.argv.slice(2)}));});");
   const c = api.saveTool('a', { kind: 'cli', name: 'echo', description: 'Echo a value', command: process.execPath, args: [fixture, 'fixed'], inputSchema: schema });
-  assert.equal(fs.statSync(path.join(root, 'tool-connections.json')).mode & 0o777, 0o600);
+  if (process.platform !== 'win32') assert.equal(fs.statSync(path.join(root, 'tool-connections.json')).mode & 0o777, 0o600);
   assert.equal((await api.connectedTools('b')).length, 0);
   const [tool] = await api.connectedTools('a');
   const injection = '$(touch /tmp/never-execute-this) `id`';

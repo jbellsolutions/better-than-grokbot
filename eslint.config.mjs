@@ -6,7 +6,7 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   // Node utilities and node:test files deliberately use the CommonJS format.
-  { files: ["scripts/**/*.cjs", "test/**/*.cjs"], rules: { "@typescript-eslint/no-require-imports": "off" } },
+  { files: ["scripts/**/*.cjs", "test/**/*.cjs", "windows/**/*.cjs"], rules: { "@typescript-eslint/no-require-imports": "off" } },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
@@ -22,6 +22,7 @@ const eslintConfig = defineConfig([
     ".scratch/**",
     ".data/**",
     ".cloudroom/**",
+    "windows/evidence/**",
   ]),
 ]);
 

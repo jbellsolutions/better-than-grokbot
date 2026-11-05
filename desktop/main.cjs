@@ -1,7 +1,7 @@
 /**
- * Bops for Mac. A native window around the Bops app: it starts the app's local server if one
+ * Bops desktop. A native window around the Bops app: it starts the app's local server if one
  * isn't already running, opens the window with the Mac title bar from the design, and on quit
- * stops what it started, including the bots' background browsers.
+ * stops the coordinator it started.
  */
 const { app, BrowserWindow, desktopCapturer, dialog, ipcMain, nativeImage, Notification, screen, shell, systemPreferences } = require("electron");
 const { execFileSync, spawn } = require("node:child_process");
@@ -9,6 +9,7 @@ const fs = require("node:fs");
 const net = require("node:net");
 const path = require("node:path");
 
+process.env.BOPS_DISTRIBUTION = "better-than-grokbot";
 const PORT = 3210;
 const URL = `http://localhost:${PORT}`;
 const REPO = (() => {
@@ -19,16 +20,19 @@ const REPO = (() => {
   }
 })();
 const ICON = path.join(__dirname, "icon.png");
-const { readRegistry, verify } = require("./instances.cjs");
+const { readRegistry, verify, registryFile, createInstance } = require("./instances.cjs");
 const instanceWindows = new Map();
 const openingInstances = new Map();
 
 let server;
+const servers = new Map();
+const registryRoot = () => app.isPackaged ? app.getPath("userData") : REPO;
 let mainWin;
 let pipWin;
 
 /** Apps opened from Finder get a bare PATH; borrow the login shell's so node and codex resolve. */
 function loginPath() {
+  if (process.platform !== "darwin") return process.env.PATH;
   try {
     return execFileSync(process.env.SHELL || "/bin/zsh", ["-ilc", 'printf %s "$PATH"'], { timeout: 5000 }).toString();
   } catch {
@@ -37,18 +41,20 @@ function loginPath() {
 }
 
 /** Bops' server is answering. /api/health imports nothing, so a missing key can't hold up the start. */
-async function serverUp() {
+async function serverUp(url = URL, id = "default") {
   try {
-    return (await fetch(`${URL}/api/health`, { signal: AbortSignal.timeout(1500) })).ok;
+    const response = await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(1500) });
+    const health = await response.json();
+    return response.ok && health.bops === true && health.product === "better-than-grokbot" && health.instance?.id === id;
   } catch {
     return false;
   }
 }
 
 /** Something already listens on the port (a server from an earlier start that's still loading, say). */
-function portTaken() {
+function portTaken(port = PORT) {
   return new Promise((resolve) => {
-    const s = net.connect(PORT, "127.0.0.1");
+    const s = net.connect(port, "127.0.0.1");
     s.once("connect", () => (s.destroy(), resolve(true)));
     s.once("error", () => resolve(false));
     s.setTimeout(1000, () => (s.destroy(), resolve(false)));
@@ -61,62 +67,58 @@ function portTaken() {
  * with `npm run app:build` (desktop/repo.json) runs `next start` in the source folder;
  * `npm run app` uses development mode unless BOPS_APP_PRODUCTION=1.
  */
-function packagedServer() {
+function packagedServer(entry = { id: "default" }) {
   if (!app.isPackaged || fs.existsSync(path.join(__dirname, "repo.json"))) return null;
   const dir = path.join(process.resourcesPath, "server");
   if (!fs.existsSync(path.join(dir, "server.js"))) return null;
   // The app bundle is read-only (and sealed by its signature), but the server keeps its state in
   // .data/ under its working folder and reads vm/ and node_modules/ from there. So it runs in
   // ~/Library/Application Support/Bops/server, where everything but .data links into the bundle.
-  const home = path.join(app.getPath("userData"), "server");
-  fs.mkdirSync(path.join(home, ".data"), { recursive: true });
-  for (const name of fs.readdirSync(dir)) {
-    if (name === ".data" || name.startsWith(".env")) continue;
-    const link = path.join(home, name);
-    const st = fs.lstatSync(link, { throwIfNoEntry: false });
-    if (st && !st.isSymbolicLink()) continue;
-    if (st && fs.readlinkSync(link) === path.join(dir, name)) continue;
-    if (st) fs.unlinkSync(link);
-    fs.symlinkSync(path.join(dir, name), link);
-  }
+  const home = path.join(app.getPath("userData"), entry.id === "default" ? "server" : `server-${entry.id}`);
+  require("./runtime.cjs").linkServer(dir, home);
   // Settings for this Mac (self-hosting, testing) go in ~/Library/Application Support/Bops/.env.local;
   // the app itself ships with no keys.
   let env = {};
   try {
     env = require("node:util").parseEnv(fs.readFileSync(path.join(app.getPath("userData"), ".env.local"), "utf8"));
   } catch {}
-  const relay = path.join(process.resourcesPath, "bin", "orgo-relay");
+  const relay = path.join(process.resourcesPath, "bin", process.platform === "win32" ? "orgo-relay.exe" : "orgo-relay");
   // What the server prints, for support: ~/Library/Logs/Bops/server.log. Each start adds to it (an
   // earlier start's error is often the one that matters); it starts over once it passes 5 MB.
   fs.mkdirSync(app.getPath("logs"), { recursive: true });
   const logFile = path.join(app.getPath("logs"), "server.log");
   const big = (fs.statSync(logFile, { throwIfNoEntry: false })?.size ?? 0) > 5 * 1024 * 1024;
   const log = fs.openSync(logFile, big ? "w" : "a");
-  fs.writeSync(log, `\n--- Bops ${app.getVersion()} starting, ${new Date().toISOString()}\n`);
-  return { dir, home, log, env: { ...env, ...(fs.existsSync(relay) ? { BOPS_RELAY_BIN: relay } : {}) } };
+  fs.writeSync(log, `\n--- Better Than GrokBot ${app.getVersion()} starting, ${new Date().toISOString()}\n`);
+  return { dir, home, log, env: { ...(entry.id === "default" ? env : {}), BOPS_SELF_HOSTED: "1", BOPS_DISTRIBUTION: "better-than-grokbot", BOPS_DATABASE_URL: "", BOPS_INSTANCE_ID: entry.id, BOPS_INSTANCE_NAME: entry.name, BOPS_DATA_DIR: path.join(home, ".data"), BOPS_INSTANCE_REGISTRY: registryFile(registryRoot()), ...(fs.existsSync(relay) ? { BOPS_RELAY_BIN: relay } : {}) } };
 }
 
-async function startServer() {
-  if (await serverUp()) return;
+async function startServer(entry = { id: "default", port: PORT, url: URL }) {
+  const port = entry.port;
+  const url = entry.url;
+  if (await serverUp(url, entry.id)) return;
   // The login service owns the coordinator. Desktop windows are clients, even during startup.
   if (process.platform === "darwin" && fs.existsSync(path.join(REPO, ".data", "service.json"))) {
     execFileSync("/bin/launchctl", ["kickstart", `gui/${process.getuid()}/ai.orgo.bops.selfhosted.server`], { timeout: 5000, stdio: "ignore" });
     for (let i = 0; i < 120; i++) {
-      if (await serverUp()) return;
+      if (await serverUp(url, entry.id)) return;
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
-    throw new Error("The Bops background service did not start. Check its logs in ~/Library/Logs/Bops.");
+    throw new Error("The Better Than GrokBot background service did not start. Check its logs in ~/Library/Logs/Better Than GrokBot.");
   }
   // A second server on a taken port only fails (EADDRINUSE): wait for the one that's there instead.
-  if (await portTaken()) {
-    for (let i = 0; i < 240 && !(await serverUp()); i++) await new Promise((r) => setTimeout(r, 500));
-    return;
+  if (await portTaken(port)) {
+    for (let i = 0; i < 240; i++) {
+      if (await serverUp(url, entry.id)) return;
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    throw new Error(`Port ${port} is occupied but Better Than GrokBot is not responding. Close the other program and retry.`);
   }
-  const packaged = packagedServer();
+  const packaged = packagedServer(entry);
   server = packaged
     ? // Run as Node by the app's own binary. server.js changes into its folder on start; keeping the
       // working folder in Application Support is what lets the server write its state.
-      spawn(process.execPath, ["-e", "process.chdir = () => {}; require(process.env.BOPS_SERVER_JS)"], {
+      spawn(process.execPath, ["-e", "process.chdir = () => {}; process.on('message', m => { if (m === 'bops:shutdown') process.emit('SIGTERM'); }); require(process.env.BOPS_SERVER_JS)"], {
         cwd: packaged.home,
         env: {
           ...process.env,
@@ -127,37 +129,46 @@ async function startServer() {
           NODE_ENV: "production",
           // The server exits on SIGTERM itself, after its last work (the state saved, and backed up to Bops Cloud).
           NEXT_MANUAL_SIG_HANDLE: "true",
-          PORT: String(PORT),
+          PORT: String(port),
           // Only this Mac can reach the bundled server, unless its settings say BOPS_LISTEN_ALL=1:
           // bot computers' app calls and phone webhooks reach Bops over the tailnet, so they need
           // it (proxy.ts then lets other addresses reach only those paths).
           HOSTNAME: packaged.env.BOPS_LISTEN_ALL === "1" ? "0.0.0.0" : "127.0.0.1",
         },
-        stdio: ["ignore", packaged.log, packaged.log],
+        stdio: ["ignore", packaged.log, packaged.log, "ipc"],
+        windowsHide: true,
         detached: true,
       })
-    : spawn("npx", ["next", process.env.BOPS_APP_PRODUCTION === "1" || app.isPackaged ? "start" : "dev", "--port", String(PORT), "--hostname", "127.0.0.1"], {
+    : spawn(process.execPath, [path.join(REPO, "node_modules/next/dist/bin/next"), process.env.BOPS_APP_PRODUCTION === "1" || app.isPackaged ? "start" : "dev", "--port", String(port), "--hostname", "127.0.0.1"], {
         cwd: REPO,
-        env: { ...process.env, PATH: loginPath() },
+        env: { ...process.env, PATH: loginPath(), ELECTRON_RUN_AS_NODE: "1" },
         stdio: "ignore",
         detached: true,
       });
-  for (let i = 0; i < 240 && !(await serverUp()); i++) await new Promise((r) => setTimeout(r, 500));
+  servers.set(entry.id, server);
+  let failed;
+  server.once("error", (e) => { failed = e; });
+  server.once("exit", (code) => { failed = new Error(`Better Than GrokBot server exited (${code}). Check server.log in ${app.getPath("logs")}.`); });
+  for (let i = 0; i < 240; i++) {
+    if (failed) throw failed;
+    if (await serverUp(url, entry.id)) return;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  throw new Error(`Better Than GrokBot did not start within two minutes. Check ${app.getPath("logs")}.`);
 }
 
-const splash = `data:text/html,${encodeURIComponent(`<body style="margin:0;height:100vh;display:flex;align-items:center;justify-content:center;font:13px -apple-system,system-ui;color:#6B6B6B;-webkit-app-region:drag">Starting Better than GrokBot…</body>`)}`;
+const splash = `data:text/html,${encodeURIComponent(`<body style="margin:0;height:100vh;display:flex;align-items:center;justify-content:center;font:13px -apple-system,system-ui;color:#6B6B6B;-webkit-app-region:drag">Starting Better Than GrokBot…</body>`)}`;
 
 async function createWindow(instanceId = "default") {
-  const entry = readRegistry(REPO).find(e => e.id === instanceId);
+  const entry = readRegistry(registryRoot()).find(e => e.id === instanceId);
   if (!entry) throw new Error("Unknown app instance");
   const win = new BrowserWindow({
     width: 1360,
     height: 860,
     minWidth: 1180,
     minHeight: 640,
-    title: entry.id === "default" ? "Better than GrokBot" : entry.name,
-    titleBarStyle: "hiddenInset",
-    trafficLightPosition: { x: 14, y: 14 },
+    title: entry.id === "default" ? "Better Than GrokBot" : entry.name,
+    ...(process.platform === "darwin" ? { titleBarStyle: "hiddenInset", trafficLightPosition: { x: 14, y: 14 } } : {}),
     backgroundColor: "#FFFFFF",
     icon: ICON,
     // Web pages open as tabs inside Bops (see components/app/panel-tabs.tsx). The preload lets the
@@ -176,10 +187,9 @@ async function createWindow(instanceId = "default") {
   });
   await win.loadURL(splash);
   try {
-    if (entry.id === "default") await startServer();
-    else await verify(entry);
+    await startServer(entry);
   } catch (e) {
-    dialog.showErrorBox("Better than GrokBot could not start", e.message);
+    dialog.showErrorBox("Better Than GrokBot could not start", e.message);
     if (entry.id === "default") app.quit();
     else win.close();
     return;
@@ -245,7 +255,7 @@ ipcMain.handle("mac-screens", async () => {
   const list = await desktopCapturer.getSources({ types: ["screen", "window"], thumbnailSize: { width: 0, height: 0 } });
   return { access, displays, bopsOn, sources: list.map((s) => ({ id: s.id, name: s.name, displayId: s.display_id || undefined })) };
 });
-ipcMain.handle("mac-screen-settings", () => shell.openExternal("x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"));
+ipcMain.handle("mac-screen-settings", () => process.platform === "darwin" ? shell.openExternal(PANES.screen) : undefined);
 
 /*
  * What Bops asks macOS for, all in one place (components/app/setup.tsx, and Settings → This Mac):
@@ -296,7 +306,7 @@ function askNotify() {
       }
       resolve(status);
     };
-    const n = new Notification({ title: "Better than GrokBot", body: "Your bots can tell you when something needs you.", silent: true });
+    const n = new Notification({ title: "Better Than GrokBot", body: "Your bots can tell you when something needs you.", silent: true });
     n.once("show", () => done("granted"));
     n.once("failed", () => done("denied"));
     const timer = setTimeout(() => done(notifyKnown() ?? "not-determined"), 30_000);
@@ -305,7 +315,7 @@ function askNotify() {
 }
 
 function permStatus(id) {
-  if (!mac) return id === "notifications" ? notifyStatus() : "granted";
+  if (!mac) return id === "notifications" ? notifyStatus() : id === "accessibility" ? "restricted" : "granted";
   if (id === "screen") return screenStatus();
   if (id === "microphone") return systemPreferences.getMediaAccessStatus(id);
   if (id === "accessibility") return systemPreferences.isTrustedAccessibilityClient(false) ? "granted" : "not-determined";
@@ -317,7 +327,7 @@ ipcMain.handle("app-name", () => app.getName());
 ipcMain.handle("perm-status", () => Object.fromEntries(PERM_IDS.map((id) => [id, permStatus(id)])));
 ipcMain.handle("perm-request", async (_, id) => {
   if (!PERM_IDS.includes(id)) return "unknown";
-  if (!mac) return id === "notifications" ? askNotify() : "granted";
+  if (!mac) return id === "notifications" ? askNotify() : permStatus(id);
   if (id === "microphone") {
     await systemPreferences.askForMediaAccess("microphone").catch(() => false);
   } else if (id === "screen") {
@@ -330,13 +340,17 @@ ipcMain.handle("perm-request", async (_, id) => {
   }
   return permStatus(id);
 });
-ipcMain.handle("perm-settings", (_, id) => (PANES[id] ? shell.openExternal(PANES[id]) : undefined));
+const WINDOWS_PANES = { microphone: "ms-settings:privacy-microphone", notifications: "ms-settings:notifications" };
+ipcMain.handle("perm-settings", (_, id) => {
+  const pane = (process.platform === "win32" ? WINDOWS_PANES : PANES)[id];
+  return pane ? shell.openExternal(pane) : undefined;
+});
 // Screen Recording was turned on after Bops started: it works once Bops restarts.
 ipcMain.handle("perm-screen-restart", () => mac && screenAtLaunch !== "granted" && systemPreferences.getMediaAccessStatus("screen") === "granted");
 // Stop the server first and wait for its port to close, so the new Bops starts its own instead of
 // finding the old one still answering and then losing it.
 ipcMain.handle("relaunch", async () => {
-  if (stopServer()) for (let i = 0; i < 40 && (await serverUp()); i++) await new Promise((r) => setTimeout(r, 250));
+  if (await stopServer()) for (let i = 0; i < 40 && (await serverUp()); i++) await new Promise((r) => setTimeout(r, 250));
   app.relaunch();
   app.quit();
 });
@@ -377,16 +391,16 @@ ipcMain.handle("mac-show-main", () => {
 });
 
 // Preserve the bundle product name: macOS grants belong to this app, not the hosted Bops app.
-app.setName("Better than GrokBot");
-app.setPath("userData", path.join(app.getPath("appData"), "Bops Self-Hosted"));
+app.setName("Better Than GrokBot");
+app.setPath("userData", path.join(app.getPath("appData"), "Better Than GrokBot"));
 
 // Each instance retains its own window, pending requests, conversations and browser session.
 ipcMain.handle("instance-select", async (event, id) => {
-  const entries = readRegistry(REPO);
+  const entries = readRegistry(registryRoot());
   const source = entries.find(e => event.sender.getURL().startsWith(`${e.url}/`));
   const target = entries.find(e => e.id === id);
   if (!source || !target) throw new Error("Unknown app instance");
-  await verify(target);
+  if (!app.isPackaged) await verify(target);
   const previous = BrowserWindow.fromWebContents(event.sender);
   if (!instanceWindows.get(id) || instanceWindows.get(id).isDestroyed()) {
     if (!openingInstances.has(id)) openingInstances.set(id, createWindow(id).finally(() => openingInstances.delete(id)));
@@ -399,8 +413,33 @@ ipcMain.handle("instance-select", async (event, id) => {
   next.show(); next.focus(); mainWin = next;
 });
 
+const userDataOverride = app.commandLine.getSwitchValue("user-data-dir");
+if (userDataOverride) {
+  fs.mkdirSync(path.resolve(userDataOverride), { recursive: true });
+  app.setPath("userData", path.resolve(userDataOverride));
+}
+if (process.platform === "win32") {
+  app.setAppUserModelId("com.betterthangrokbot.desktop.windows");
+  app.setAppLogsPath(path.join(app.getPath("userData"), "logs"));
+}
+// A second launch must not own another coordinator or kill the first one's server.
+const primaryInstance = app.requestSingleInstanceLock();
+if (!primaryInstance) app.quit();
+app.on("second-instance", () => { if (mainWin) { mainWin.restore(); mainWin.show(); mainWin.focus(); } });
+ipcMain.handle("instance-create", async (event, name) => {
+  const source = readRegistry(registryRoot()).find(e => event.sender.getURL().startsWith(`${e.url}/`));
+  if (!source) throw Error("Unknown app instance");
+  const entry = createInstance(registryRoot(), name);
+  await createWindow(entry.id);
+  return entry.id;
+});
 app.whenReady().then(() => {
+  if (!primaryInstance) return;
   if (process.platform === "darwin" && fs.existsSync(ICON)) app.dock.setIcon(nativeImage.createFromPath(ICON));
+  const entries = readRegistry(registryRoot());
+  const file = registryFile(registryRoot());
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  if (!fs.existsSync(file)) fs.writeFileSync(file, JSON.stringify(entries), { mode: 0o600 });
   void createWindow();
   app.on("activate", () => {
     if (mainWin && !mainWin.isDestroyed()) { mainWin.show(); mainWin.focus(); }
@@ -410,17 +449,27 @@ app.whenReady().then(() => {
 
 app.on("window-all-closed", () => app.quit());
 
-/** Stops the server Bops started (and the bots' browsers). Says whether there was one. */
-function stopServer() {
-  if (!server) return false;
-  try {
-    process.kill(-server.pid);
-  } catch {}
-  server = undefined;
-  try {
-    execFileSync("pkill", ["-f", ".bops/chrome/"]);
-  } catch {}
-  return true;
+/** Flushes and stops the server this app started. Says whether there was one. */
+async function stopServer() {
+  const children = [...servers.values()];
+  servers.clear(); server = undefined;
+  await Promise.all(children.map(async child => {
+    if (child.connected && child.exitCode === null) {
+      await new Promise(resolve => {
+        const timer = setTimeout(resolve, 6000);
+        child.once("exit", () => { clearTimeout(timer); resolve(); });
+        child.send("bops:shutdown", () => {});
+      });
+    }
+    if (child.exitCode === null && child.signalCode === null) require("./runtime.cjs").stopProcessTree(child.pid);
+  }));
+  return children.length > 0;
 }
 
-app.on("will-quit", () => void stopServer());
+let quitting = false;
+app.on("before-quit", (event) => {
+  if (!servers.size || quitting) return;
+  event.preventDefault();
+  quitting = true;
+  void stopServer().finally(() => app.quit());
+});

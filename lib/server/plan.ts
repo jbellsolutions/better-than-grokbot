@@ -76,6 +76,7 @@ const msOf = (t: string | number | null | undefined) => (typeof t === "number" ?
  * plans yet. Credit to spend clears the app's "out of AI credit" (state.credits).
  */
 export async function readBopsPlan(key: string): Promise<BopsPlan | null> {
+  if (process.env.BOPS_DISTRIBUTION === "better-than-grokbot") return null;
   const got = await askOrgo<BopsPlanAnswer>(key, "/api/bops/plan");
   if (!got.ok) return null;
   const a = got.json;
@@ -116,6 +117,7 @@ export type BopsBillingLink = { url: string } | { error: string; status: number;
  * change or cancel the plan (its POST /api/bops/portal): a page for the user's browser.
  */
 export async function bopsBillingLink(key: string, what: { tier: "pro_bops" | "max_bops" } | "manage"): Promise<BopsBillingLink> {
+  if (process.env.BOPS_DISTRIBUTION === "better-than-grokbot") return { error: "Manage model usage in OpenRouter and computers in Orgo.", status: 404 };
   const got = await postOrgo<{ url?: unknown; error?: unknown; code?: unknown }>(key, what === "manage" ? "/api/bops/portal" : "/api/bops/checkout", what === "manage" ? {} : what);
   if (!got) return { error: "Couldn't reach Orgo. Check your internet connection and try again.", status: 502 };
   if (got.status >= 200 && got.status < 300 && typeof got.json.url === "string" && /^https:\/\//.test(got.json.url)) return { url: got.json.url };
@@ -374,7 +376,7 @@ function shareFree(main: Bot, holder: Bot, why: PlanLimit, epoch: number) {
     chatId: botChatId(main.id),
     role: "bot",
     botId: main.id,
-    text: `I'll work on your free Bops computer, which ${holder.name} has, instead of one of my own. ${why.message} [${why.link.label}](${why.link.url}) Once your Orgo plan has room, you can switch me to Its own under Computer in my Details.`,
+    text: `I'll work on your free Better Than GrokBot computer, which ${holder.name} has, instead of one of my own. ${why.message} [${why.link.label}](${why.link.url}) Once your Orgo plan has room, you can switch me to Its own under Computer in my Details.`,
   });
   return null;
 }

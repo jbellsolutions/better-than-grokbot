@@ -61,3 +61,5 @@ __pycache__/
 
 # Agent charters written during install (INSTALL.md): yours, not the project's.
 /charters/
+# Native Windows validation output
+/windows/evidence/

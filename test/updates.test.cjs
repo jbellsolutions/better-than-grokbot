@@ -34,7 +34,8 @@ test('update checks establish a quiet baseline, notify only changes, and preserv
   assert.equal(back.errors.length, 0);
   assert.equal(back.sources.length, 3);
   const backup = path.join(root, 'Library/Application Support/Bops Self-Hosted/backups', `state-${new Date().toISOString().slice(0, 10)}`, 'state.json');
-  assert.equal(fs.statSync(backup).mode & 0o777, 0o600);
+  // Windows exposes DOS attributes through stat.mode; Unix permission bits apply on POSIX.
+  if (process.platform !== 'win32')assert.equal(fs.statSync(backup).mode & 0o777, 0o600);
 });
 
 const install = fs.readFileSync('scripts/install-selfhost.cjs', 'utf8').replace(/main\(\)\.catch[\s\S]*$/, '');

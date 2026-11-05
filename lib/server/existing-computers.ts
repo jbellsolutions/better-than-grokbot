@@ -18,7 +18,7 @@ export async function observedScreens(computerId: string): Promise<OrgoScreen[]>
 
 /** Selecting an existing VM never creates, deletes, resizes, or powers a VM on. */
 export async function assignComputer(botId: string, computerId: string): Promise<{ ok: true } | { error: string }> {
-  if (instanceId() !== "default" && computerId !== instanceComputer()) return { error: "This instance is bound to its business computer. Switch app instances to use another computer." };
+  if (instanceComputer() && instanceId() !== "default" && computerId !== instanceComputer()) return { error: "This instance is bound to its business computer. Switch app instances to use another computer." };
   const b = bot(botId);
   if (!b) return { error: "No such agent." };
   if (typeof computerId !== "string" || !/^[a-f0-9-]{36}$/i.test(computerId)) return { error: "Choose a computer from your Orgo account." };
@@ -26,12 +26,12 @@ export async function assignComputer(botId: string, computerId: string): Promise
   if (b.computerStatus === "cloning") return { error: "Wait for computer setup to finish first." };
   // Managed clones have a separate, explicit deletion flow; switching must never silently delete one.
   if (b.computerId && !b.externalComputer && b.computerId !== process.env.BOPS_ORGO_COMPUTER_ID)
-    return { error: "Move this agent to Shared first to review what happens to its Bops-created computer." };
+    return { error: "Move this agent to Shared first to review what happens to its Better Than GrokBot-created computer." };
   let c;
   try { c = (await orgo.computers()).find((x) => x.id === computerId); }
   catch { return { error: "Could not read your Orgo account. Check the connection and retry." }; }
   if (!c) return { error: "That computer is not available in your Orgo account." };
-  if (c.os !== "linux") return { error: "Bops currently supports Linux Orgo computers." };
+  if (c.os !== "linux") return { error: "Better Than GrokBot currently supports Linux Orgo computers." };
   if (c.status !== "running") return { error: "Start this computer in Orgo first, then refresh the list." };
   const st = getState();
   if (bot(botId) !== b || (b.computerStatus as string) === "cloning") return { error: "The agent changed during selection. Retry." };
@@ -71,9 +71,9 @@ export async function prepareComputer(computerId: string) {
   const payload = Buffer.from(JSON.stringify(manifest)).toString("base64");
   const command = `set -eu
 if [ -f /opt/bops/selfhost-runtime-v1 ]; then exit 0; fi
-[ "$(id -u)" = 0 ] || { echo 'Bops setup requires the Orgo root environment.'; exit 1; }
-command -v node >/dev/null && command -v npm >/dev/null && [ -x /usr/bin/google-chrome-stable ] || { echo 'This computer needs Node, npm and Chrome before Bops can use it.'; exit 1; }
-[ "$(df -Pk / | awk 'NR==2 {print $4}')" -gt 2000000 ] || { echo 'Bops needs 2 GB of free disk space.'; exit 1; }
+[ "$(id -u)" = 0 ] || { echo 'Better Than GrokBot setup requires the Orgo root environment.'; exit 1; }
+command -v node >/dev/null && command -v npm >/dev/null && [ -x /usr/bin/google-chrome-stable ] || { echo 'This computer needs Node, npm and Chrome before Better Than GrokBot can use it.'; exit 1; }
+[ "$(df -Pk / | awk 'NR==2 {print $4}')" -gt 2000000 ] || { echo 'Better Than GrokBot needs 2 GB of free disk space.'; exit 1; }
 DEBIAN_FRONTEND=noninteractive apt-get update -qq
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3-venv jq rsync xdotool scrot hsetroot plank libglib2.0-bin
 mkdir -p /opt/bops/pw /opt/bops/desktop /workspace /root/profiles /root/.bops /var/log/bops
@@ -90,5 +90,5 @@ PY
 node -e "require('/opt/bops/pw/node_modules/@playwright/mcp/package.json')"
 touch /opt/bops/selfhost-runtime-v1`;
   const r = await orgo.bash(computerId, command, 600);
-  if (r.exit_code !== 0) throw new Error(`Bops runtime setup failed. ${r.output.slice(-600)}`);
+  if (r.exit_code !== 0) throw new Error(`Better Than GrokBot runtime setup failed. ${r.output.slice(-600)}`);
 }

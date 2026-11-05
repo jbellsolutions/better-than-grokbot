@@ -6,5 +6,5 @@ export const dynamic = "force-dynamic";
  * so it imports nothing: a missing key or a slow module can't keep the window on its splash screen.
  */
 export async function GET() {
-  return Response.json({ bops: true, instance: instanceInfo() });
+  return Response.json({ bops: true, product: "better-than-grokbot", instance: instanceInfo() });
 }

@@ -24,7 +24,7 @@ const seedBots: Bot[] = [
 ];
 
 /** The main bot as on day one: no computer yet (one launches from the Bops template on its first task), nothing connected. */
-const freshMain = (): Bot => instanceId() === "default"
+const freshMain = (): Bot => (instanceId() === "default" || process.env.BOPS_DISTRIBUTION === "better-than-grokbot")
   ? ({ ...seedBots.find((b) => b.isMain)!, computerId: undefined, computerStatus: "none" })
   : ({ id: "ops", name: instanceName(), role: "Coordinate this team. Follow the owner’s goals and approval requirements.", color: "#0A0A0A", isMain: true, computerId: instanceComputer(), externalComputer: true, computerStatus: "ready", runsOn: "cloud" });
 
@@ -82,7 +82,7 @@ function migrate(raw: Record<string, unknown>): AppState {
       old.status = "queued"; old.routing = false; old.display = undefined;
     } else if (old.status === "queued" || old.status === "starting" || old.status === "running") {
       old.status = "failed";
-      old.error = "Bops restarted while this was running";
+      old.error = "Better Than GrokBot restarted while this was running";
       old.display = undefined;
     }
   }
