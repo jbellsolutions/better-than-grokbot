@@ -20,7 +20,7 @@ test('the file stays private, bad names and multi-line values change nothing, an
   const file = path.join(dir, '.env.local');
   fs.writeFileSync(file, 'A=1\n', { mode: 0o644 });
   setKey(file, 'OPENROUTER_API_KEY', 'secret-value');
-  assert.equal(fs.statSync(file).mode & 0o777, 0o600);
+  if (process.platform !== 'win32') assert.equal(fs.statSync(file).mode & 0o777, 0o600);
   assert.throws(() => setKey(file, 'bad name', 'x'), /name/);
   assert.throws(() => setKey(file, 'B', 'one\ntwo'), /line break/);
   assert.throws(() => setKey(file, 'B', ''), /No value/);

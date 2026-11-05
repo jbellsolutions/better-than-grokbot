@@ -2,6 +2,7 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("bopsMac", {
+  platform: process.platform,
   appName: () => ipcRenderer.invoke("app-name"),
   screens: () => ipcRenderer.invoke("mac-screens"),
   openScreenSettings: () => ipcRenderer.invoke("mac-screen-settings"),
@@ -22,5 +23,6 @@ contextBridge.exposeInMainWorld("bopsMac", {
 
 contextBridge.exposeInMainWorld("bopsInstances", {
   id: process.argv.find(a => a.startsWith("--bops-instance="))?.split("=")[1] || "default",
+  create: name => ipcRenderer.invoke("instance-create", name),
   select: id => ipcRenderer.invoke("instance-select", id),
 });

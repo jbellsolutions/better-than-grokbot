@@ -450,3 +450,7 @@ restart.
 
 The registry gives each team a fixed loopback port. Rebuilding this checkout only restarts services whose LaunchAgent
 working directory points to this checkout; separately hosted instances are preserved.
+
+## Windows preview
+
+Download the [Better Than GrokBot Windows x64 installer](https://github.com/jbellsolutions/better-than-grokbot/releases/tag/windows-preview-0.0.7). First launch asks for your own OpenRouter key, model, Orgo account and computer. See [Windows setup and build instructions](windows/README.md).

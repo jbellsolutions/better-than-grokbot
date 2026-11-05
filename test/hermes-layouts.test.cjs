@@ -6,7 +6,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const load = require('./helpers/load-ts.cjs');
 
-test('Hermes bridge runs on both installed SDK layouts and fails when neither exists', async t => {
+test('Hermes bridge runs on both installed SDK layouts and fails when neither exists', { skip: process.platform === 'win32' }, async t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'bops-hermes-layouts-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const sdkPaths = ['/usr/local/lib/hermes-agent', '/home/hermes/.hermes/hermes-agent'];

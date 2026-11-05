@@ -2,10 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { parseEnv } = require('node:util');
 
-// The team that ships. Separate teams are added to the registry with `node scripts/instances.cjs add`.
-const definitions = [
-  { id: 'default', name: 'Current Bops', port: 3210, purpose: 'Your existing team', cdp: 9300 },
-];
+const definitions = [{ id: 'default', name: 'Better Than GrokBot', port: 3210, purpose: 'Your team', cdp: 9300 }];
 const registryFile = root => path.join(root, '.data', 'instances.json');
 function readRegistry(root) {
   if (!fs.existsSync(registryFile(root))) return [{ ...definitions[0], url: 'http://localhost:3210' }];
@@ -15,7 +12,7 @@ function readRegistry(root) {
 
 /** Future computers use independent local ports; never accept arbitrary remote endpoints. */
 function validateRegistry(records) {
-  if (!Array.isArray(records) || !records.length || records[0]?.id !== 'default' || new Set(records.map(r => r?.id)).size !== records.length || records.some((r, i) => !r || !/^[a-z][a-z0-9-]{0,39}$/.test(r.id) || r.port !== 3210 + i || r.port > 65535 || r.url !== `http://localhost:${r.port}`)) throw Error('Invalid Bops instance registry');
+  if (!Array.isArray(records) || !records.length || records[0]?.id !== 'default' || new Set(records.map(r => r?.id)).size !== records.length || records.some((r, i) => !r || !/^[a-z][a-z0-9-]{0,39}$/.test(r.id) || r.port !== 3210 + i || r.port > 65535 || r.url !== `http://localhost:${r.port}`)) throw Error('Invalid Better Than GrokBot instance registry');
   return records;
 }
 
@@ -51,4 +48,17 @@ async function verify(entry, fetchImpl = fetch) {
   if (entry.computerId && health.instance.computerId !== entry.computerId) throw Error(`${entry.name} has the wrong computer binding`);
   return health;
 }
-module.exports = { definitions, registryFile, readRegistry, validateRegistry, instanceEnv, verify };
+function createInstance(root, name) {
+  if (typeof name !== 'string' || !name.trim() || name.trim().length > 60) throw Error('Name the instance using 1–60 characters.');
+  const entries = readRegistry(root);
+  if (entries.length >= 20) throw Error('You can create up to 20 instances.');
+  const index = entries.length;
+  const entry = { id: `instance-${index}`, name: name.trim(), purpose: 'Independent team', port: 3210 + index, url: `http://localhost:${3210 + index}`, cdp: 9300 + 1000 * index };
+  entries.push(entry);
+  fs.mkdirSync(path.dirname(registryFile(root)), { recursive: true });
+  const tmp = registryFile(root) + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(validateRegistry(entries)), { mode: 0o600 });
+  fs.renameSync(tmp, registryFile(root));
+  return entry;
+}
+module.exports = { createInstance, definitions, registryFile, readRegistry, validateRegistry, instanceEnv, verify };

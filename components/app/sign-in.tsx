@@ -56,7 +56,7 @@ const openInBrowser = (url: string) => void window.open(url, "_blank", "noopener
 const primary = "flex h-10 w-full items-center justify-center gap-2 rounded-full bg-ink text-[13.5px] font-medium text-white disabled:opacity-50";
 const secondary = "flex h-10 w-full items-center justify-center rounded-full text-[13.5px] font-medium shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#FCFCFB]";
 
-export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
+export function SignIn({ onSignedIn, allowApiKey = false }: { onSignedIn: () => void; allowApiKey?: boolean }) {
   const [step, setStep] = useState<Step>({ kind: "idle" });
 
   const start = async () => {
@@ -148,6 +148,7 @@ export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
           ) : (
             <Ask step={step} onStart={() => void (step.kind === "problem" && step.problem === "keychain" ? saveAgain() : start())} />
           )}
+          {allowApiKey && <OrgoKeyForm onSignedIn={onSignedIn} />}
         </div>
         <span className="pt-5 text-[12px] leading-4 text-pencil">
           By signing in you agree to Orgo&apos;s{" "}
@@ -177,7 +178,7 @@ function Heading({ title, line }: { title: string; line: string }) {
 const PROBLEMS: Record<Problem, { title: string; line: string; action: string }> = {
   offline: { title: "Couldn't reach Orgo", line: "Check your internet connection, then try again.", action: "Try again" },
   orgo: { title: "Orgo had a problem", line: "Something went wrong on Orgo's side. Try again in a moment.", action: "Try again" },
-  keychain: { title: "Couldn't save your sign-in", line: "Your Mac didn't let Better than GrokBot keep it in the keychain. Unlock your Mac, then try again.", action: "Try again" },
+  keychain: { title: "Couldn't save your sign-in", line: "Your computer could not save your sign-in securely. Unlock it, then try again.", action: "Try again" },
 };
 
 /** The first screen, and where expired, declined and failed attempts come back to. */
@@ -186,10 +187,10 @@ function Ask({ step, onStart }: { step: Step; onStart: () => void }) {
     step.kind === "expired"
       ? { title: "That code expired", line: "Codes last a few minutes. Get a new one and approve it in your browser.", action: "Get a new code" }
       : step.kind === "denied"
-        ? { title: "Sign-in was declined", line: "This Mac wasn't approved. If that was a mistake, start again.", action: "Try again" }
+        ? { title: "Sign-in was declined", line: "This computer wasn't approved. If that was a mistake, start again.", action: "Try again" }
         : step.kind === "problem"
           ? PROBLEMS[step.problem]
-          : { title: "Welcome to Better than GrokBot", line: "Sign in with your Orgo account. Your bots and their computers live there.", action: "Sign in with Orgo" };
+          : { title: "3. Connect Orgo", line: "Sign in with your Orgo account. Your bots and their computers live there.", action: "Sign in with Orgo" };
   return (
     <>
       <Heading title={copy.title} line={copy.line} />
@@ -224,7 +225,7 @@ function Waiting({ step, onReopen, onCancel }: { step: Extract<Step, { kind: "wa
   };
   return (
     <>
-      <Heading title="Approve this Mac" line="Your browser is open at orgo.ai. Check that it shows this code, then approve." />
+      <Heading title="Connect your Orgo account" line="Your browser is open at orgo.ai. Check that it shows this code, then approve." />
       <button
         onClick={copy}
         className="group flex w-full flex-col items-center gap-1 rounded-[14px] bg-[#F7F7F6] py-4 shadow-[0_0_0_1px_#E6E6E3] hover:bg-[#F3F3F1]"
@@ -266,7 +267,23 @@ function Approved({ who }: { who: string }) {
         </svg>
         You&apos;re in
       </span>
-      <span className="text-[13.5px] leading-[19px] text-pencil">{who ? `Signed in as ${who}. Opening Better than GrokBot.` : "Opening Better than GrokBot."}</span>
+      <span className="text-[13.5px] leading-[19px] text-pencil">{who ? `Signed in as ${who}. Opening Better Than GrokBot.` : "Opening Better Than GrokBot."}</span>
     </div>
   );
+}
+
+function OrgoKeyForm({ onSignedIn }: { onSignedIn: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [key, setKey] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  if (!open) return <button className="pt-4 text-xs underline" onClick={() => setOpen(true)}>Use an Orgo API key instead</button>;
+  return <form className="flex w-full flex-col gap-2 pt-4" onSubmit={async e => {
+    e.preventDefault(); setBusy(true); setError("");
+    try {
+      const r = await fetch("/api/desktop-setup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ step: "orgo", key }) });
+      const j = await r.json(); if (!r.ok) throw Error(j.error || "Could not connect Orgo.");
+      setKey(""); onSignedIn();
+    } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  }}><label htmlFor="orgo-api-key" className="text-xs">Orgo API key</label><input id="orgo-api-key" type="password" autoComplete="off" value={key} onChange={e => setKey(e.target.value)} required className="rounded-xl border p-2 text-sm" /><button disabled={busy} className={primary}>{busy ? "Connecting…" : "Connect Orgo key"}</button>{error && <p role="alert" className="text-xs text-red-700">{error}</p>}</form>;
 }

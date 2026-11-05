@@ -40,6 +40,7 @@ export async function PATCH(request: Request) {
   if (body.teamRole !== undefined && b.isMain) return Response.json({ error: "The orchestrator already coordinates the team." }, { status: 400 });
   if (body.hidden !== undefined && (typeof body.hidden !== "boolean" || b.isMain && body.hidden))
     return Response.json({ error: b.isMain ? "The team lead stays visible." : "Use true or false for profile visibility." }, { status: 400 });
+  if (body.runsOn === "mac" && process.platform !== "darwin") return Response.json({ error: "Local Mac automation requires macOS. Select Cloud on Windows." }, { status: 400 });
   if (body.role !== undefined && (typeof body.role !== "string" || !body.role.trim() || body.role.trim().length > 500))
     return Response.json({ error: "Describe the agent’s role in 1–500 characters." }, { status: 400 });
   if (body.computerId !== undefined) {

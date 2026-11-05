@@ -3,11 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AppState } from "@/lib/types";
 import { Mascot, Spinner } from "./mascot";
-import { useMacApp } from "./mac-screens";
+import { useMacApp, useWindowsApp } from "./mac-screens";
 import { post } from "./ui";
 
 /*
- * Everything Bops needs on this Mac, in one place (Setup). It never stands in the way: signing in goes
+ * Everything Bops needs on this computer, in one place (Setup). It never stands in the way: signing in goes
  * straight to the app, and the account menu (sidebar.tsx) shows a badge while something here still
  * needs the user and they haven't skipped it, and opens this as a sheet. Settings → This Mac has the
  * same cards.
@@ -69,7 +69,7 @@ function usePermissions(every: number) {
   const inApp = useMacApp();
   const [status, setStatus] = useState<Partial<Record<PermId, PermStatus>> | null>(null);
   const [restart, setRestart] = useState(false);
-  const [appName, setAppName] = useState("Better than GrokBot");
+  const [appName, setAppName] = useState("Better Than GrokBot");
   const [error, setError] = useState("");
   const checking = useRef(false);
   const refresh = useCallback(async () => {
@@ -82,7 +82,7 @@ function usePermissions(every: number) {
         Promise.all([b.appName?.(), b.permissions.status(), b.screenNeedsRestart?.()]),
         new Promise<never>((_, reject) => { timeout = setTimeout(() => reject(Error("Permission check unavailable. Try again.")), 5000); }),
       ]);
-      setAppName(values[0] ?? "Better than GrokBot"); setStatus(values[1]); setRestart(!!values[2]); setError("");
+      setAppName(values[0] ?? "Better Than GrokBot"); setStatus(values[1]); setRestart(!!values[2]); setError("");
     } catch (e) {
       setStatus({ screen: "unknown", microphone: "unknown", notifications: "unknown", accessibility: "unknown" });
       setError((e as Error).message);
@@ -100,7 +100,7 @@ function useRelay(every: number) {
   const read = async (res: Response) => {
     const j = (await res.json().catch(() => ({}))) as Partial<RelayInfo> & { error?: string };
     if (res.status === 404) return { available: false, on: false, running: false, routedComputers: [] } satisfies RelayInfo;
-    if (!res.ok && j.available === undefined) throw new Error(j.error || j.reason || "Couldn't reach routing on this Mac.");
+    if (!res.ok && j.available === undefined) throw new Error(j.error || j.reason || "Couldn't reach routing on this computer.");
     return { available: !!j.available, on: !!j.on, reason: j.reason, device: j.device, running: !!j.running, online: j.online, routedComputers: j.routedComputers ?? [] } satisfies RelayInfo;
   };
   const load = useCallback(async () => {
@@ -249,7 +249,7 @@ const ICONS = {
 };
 
 const COPY: Record<"screen" | "microphone" | "notifications", { title: string; line: string }> = {
-  screen: { title: "Screen recording", line: "See your Mac live in Better than GrokBot, and watch bots work on it." },
+  screen: { title: "Screen recording", line: "See this computer live in Better Than GrokBot." },
   microphone: { title: "Microphone", line: "Talk to your bots on a call." },
   notifications: { title: "Notifications", line: "Hear from bots when something needs you." },
 };
@@ -259,7 +259,7 @@ function PermissionCard({ id, items }: { id: "screen" | "microphone" | "notifica
   const s = perms.status?.[id];
   const copy = COPY[id];
   if (!perms.inApp)
-    return <Card icon={ICONS[id]} title={copy.title} line={copy.line} tone="none" status="Needs the Better than GrokBot app for Mac" />;
+    return <Card icon={ICONS[id]} title={copy.title} line={copy.line} tone="none" status="Needs the Better Than GrokBot app for Mac" />;
   if (!s) return <Card icon={ICONS[id]} title={copy.title} line={copy.line} tone="none" status="Checking" />;
   // Screen Recording turned on while Bops was open: macOS applies it on the next launch.
   const restart = id === "screen" && (perms.restart || (s !== "granted" && sentToSettings.has("screen")));
@@ -270,7 +270,7 @@ function PermissionCard({ id, items }: { id: "screen" | "microphone" | "notifica
         : "Allowed"
       : s === "restricted"
         ? id === "notifications"
-          ? "Not available on this Mac"
+          ? "Not available on this computer"
           : "Blocked by your Mac's settings or admin"
         : s === "denied"
           ? restart
@@ -281,7 +281,7 @@ function PermissionCard({ id, items }: { id: "screen" | "microphone" | "notifica
             : "Not asked yet";
   const tone: Tone = s === "granted" && !(id === "screen" && perms.restart) ? "ok" : s === "not-determined" || s === "unknown" ? "off" : "todo";
   return (
-    <Card icon={ICONS[id]} title={copy.title} line={`${copy.line} Permission belongs to ${perms.appName}; enabling the upstream Bops app does not grant it here.`} tone={tone} status={perms.error || status}>
+    <Card icon={ICONS[id]} title={copy.title} line={`${copy.line} Permission belongs to ${perms.appName}.`} tone={tone} status={perms.error || status}>
       {perms.error && <button onClick={() => void perms.refresh()} className={light}>Retry check</button>}
       {restart && (
         <button onClick={() => void bridge()?.relaunch?.()} className={s === "granted" ? dark : light}>
@@ -342,7 +342,7 @@ function ComputerUseCard({ items }: { items: Items }) {
     try {
       const res = await post("/api/mac/codex", { action });
       const j = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) throw new Error(j.error || "Couldn't reach Codex on this Mac.");
+      if (!res.ok) throw new Error(j.error || "Couldn't reach Codex on this computer.");
       if (action === "open") setOpened(true);
       until.current = Date.now() + 3 * 60_000;
     } catch (e) {
@@ -350,7 +350,7 @@ function ComputerUseCard({ items }: { items: Items }) {
     }
     setBusy(false);
   };
-  const card = { icon: ICONS.computerUse, title: "Computer use on your Mac", line: "Bots use apps on this Mac through Codex. You approve each app the first time. Codex Computer Use has its own Screen Recording and Accessibility permissions, separate from Better than GrokBot." };
+  const card = { icon: ICONS.computerUse, title: "Computer use on your Mac", line: "Bots use apps on this computer through Codex. You approve each app the first time. Codex Computer Use has its own Screen Recording and Accessibility permissions, separate from Better Than GrokBot." };
   if (!m) return <Card {...card} tone="none" status={error ?? "Checking"}>{error && <button onClick={() => void check()} className={light}>Retry check</button>}</Card>;
   if (m.ready) return <Card {...card} tone="ok" status={m.plan && m.plan !== "unknown" ? `Ready on your ${planName(m.plan)} plan` : "Ready"} />;
   if (m.next === "permission") return <Card {...card} tone="todo" status={error ?? m.reason ?? "Allow this computer to use your Mac"}>
@@ -403,13 +403,14 @@ function RelayCard({ items }: { items: Items }) {
 }
 
 function Cards({ items }: { items: Items }) {
+  const windows = useWindowsApp();
   return (
     <div className="flex flex-col gap-2">
       <PermissionCard id="screen" items={items} />
       <PermissionCard id="microphone" items={items} />
       <PermissionCard id="notifications" items={items} />
-      <ComputerUseCard items={items} />
-      <RelayCard items={items} />
+      {!windows && <ComputerUseCard items={items} />}
+      {!windows && <RelayCard items={items} />}
     </div>
   );
 }
@@ -447,16 +448,16 @@ export function Setup({ state, onClose }: { state: AppState; onClose: () => void
         className="flex max-h-[90vh] w-[560px] animate-[call-in_220ms_ease-out] flex-col overflow-y-auto rounded-[22px] bg-white px-7 pb-6 pt-8 shadow-[0_0_0_1px_#0000000F,0_30px_70px_-28px_#00000038]"
       >
         <div className="flex flex-col items-center gap-1.5 pb-5 text-center">
-          <Mascot botId="boppy" color="#0A0A0A" size={48} />
-          <span className="pt-3 text-[20px] font-semibold leading-6 tracking-[-0.01em]">Set up Better than GrokBot on this Mac</span>
+          <Mascot botId="team-lead" color="#0A0A0A" size={48} />
+          <span className="pt-3 text-[20px] font-semibold leading-6 tracking-[-0.01em]">Set up Better Than GrokBot on this computer</span>
           <span className="max-w-[380px] text-[13.5px] leading-[19px] text-pencil">
             {items.perms.inApp
               ? "A few things your bots need. Allow what you want now; you can change any of it later in Settings."
-              : "Screen, microphone and notifications need the Better than GrokBot app for Mac. You can set up the rest here."}
+              : "Screen, microphone and notifications need the Better Than GrokBot app for Mac. You can set up the rest here."}
           </span>
         </div>
         <div className="flex flex-col gap-2">
-          <span className="text-[12px] leading-4 text-pencil">This Mac</span>
+          <span className="text-[12px] leading-4 text-pencil">This computer</span>
           <Cards items={items} />
         </div>
         <div className="flex flex-col gap-2 pt-5">
@@ -509,7 +510,7 @@ export function ThisMacSettings({ state }: { state: AppState }) {
   return (
     <div className="flex flex-col gap-2 px-[22px] pt-4">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-[13px] font-semibold">This Mac</span>
+        <span className="text-[13px] font-semibold">This computer</span>
         {items.perms.inApp && ASKED.some((id) => items.perms.status?.[id] === "not-determined") && (
           <button onClick={() => void allowAll(items)} className={light}>
             Allow all

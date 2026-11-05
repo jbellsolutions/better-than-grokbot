@@ -1,6 +1,9 @@
 "use client";
 
+import { DesktopOnboarding } from "./desktop-onboarding";
 import { useRememberedState } from "./use-remembered-state";
+import { useWindowsApp } from "./mac-screens";
+
 import { useEffect, useRef, useState } from "react";
 import { botChatId, live, sharesComputer, workBot, type AppState, type Host, type Session, type Watch } from "@/lib/types";
 import { Account } from "./account";
@@ -74,8 +77,7 @@ function chime() {
 export function BopsApp() {
   const state = useAppState();
   const [auth, recheck] = useAuthStatus(state?.account?.signedInAt);
-  if (auth?.needsSignIn) return <SignIn onSignedIn={recheck} />;
-  return <Bops state={auth ? state : null} />;
+  return <DesktopOnboarding state={state}>{auth?.needsSignIn ? <SignIn onSignedIn={recheck} /> : <Bops state={auth ? state : null} />}</DesktopOnboarding>;
 }
 
 function Bops({ state }: { state: AppState | null }) {
@@ -137,7 +139,7 @@ function Bops({ state }: { state: AppState | null }) {
     if (!state) return;
     const due = [
       ...(state.watches ?? []).filter((w) => w.alert?.level === "now").map((w) => ({ key: `w:${w.id}:${w.alert!.at}`, title: w.mac?.title ?? w.site, body: w.alert!.text })),
-      ...state.messages.filter((m) => m.ping).map((m) => ({ key: `m:${m.id}`, title: state.bots.find((b) => b.id === m.botId)?.name ?? "Better than GrokBot", body: m.text.replace(/\*\*|\[|\]\([^)]*\)/g, "").slice(0, 140) })),
+      ...state.messages.filter((m) => m.ping).map((m) => ({ key: `m:${m.id}`, title: state.bots.find((b) => b.id === m.botId)?.name ?? "Better Than GrokBot", body: m.text.replace(/\*\*|\[|\]\([^)]*\)/g, "").slice(0, 140) })),
     ];
     if (!pinged.current) {
       pinged.current = new Set(due.map((d) => d.key));
@@ -212,7 +214,7 @@ function Bops({ state }: { state: AppState | null }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [setThreadId]);
 
-  if (!state) return <div className="flex h-screen items-center justify-center text-pencil">Loading Better than GrokBot…</div>;
+  if (!state) return <div className="flex h-screen items-center justify-center text-pencil">Loading Better Than GrokBot…</div>;
 
   // Stay inside the workspace you're in: a chat from another one falls back to this one's main bot.
   const team = teamOf(state);
@@ -778,7 +780,7 @@ function ReachSettings() {
       : texting
         ? "Text or call your bots, and they reach you back. They know it's you from the numbers listed here."
         : "Email your bots, and they reach you back. They know it's you from the emails listed here.";
-  const unreachable = "Couldn't reach Better than GrokBot.";
+  const unreachable = "Couldn't reach Better Than GrokBot.";
   return (
     <div className="flex flex-col gap-2 px-[22px] pt-4">
       <div className="flex flex-col gap-0.5">
@@ -821,7 +823,7 @@ function PhoneService() {
           {info.texting === "none" ? " (carriers approve business texting first (A2P 10DLC), about 7–10 business days)" : ""}
         </span>
         <span>
-          <span className="text-[#9A9A98]">Calls to the bots&apos; numbers:</span> {info.calls === "agent" ? "on (each number's agent passes every turn to Better than GrokBot)" : (info.calls ?? "unknown")}
+          <span className="text-[#9A9A98]">Calls to the bots&apos; numbers:</span> {info.calls === "agent" ? "on (each number's agent passes every turn to Better Than GrokBot)" : (info.calls ?? "unknown")}
         </span>
         {info.workspaces?.map((w) => (
           <span key={w.id}>
@@ -907,7 +909,7 @@ function SelfHosting({ state }: { state: AppState }) {
     <div className="mt-5 flex flex-col border-t border-[#F0F0EE] pb-5">
       <div className="flex flex-col gap-0.5 px-[22px] pt-4">
         <span className="text-[15px] font-semibold">Self-hosting</span>
-        <span className="text-[12.5px] leading-[17px] text-[#6B6B6B]">Your own provider accounts, set in .env.local. Hosted upstream Bops runs these for its users.</span>
+        <span className="text-[12.5px] leading-[17px] text-[#6B6B6B]">Your own provider accounts, set in .env.local. Hosted upstream Better Than GrokBot runs these for its users.</span>
       </div>
 
       <div className="flex flex-col gap-2 px-[22px] pt-4">
@@ -953,6 +955,7 @@ function SelfHosting({ state }: { state: AppState }) {
 }
 
 function Settings({ state, onClose }: { state: AppState; onClose: () => void }) {
+  const windows = useWindowsApp();
   const setHost = (host: Host) => void post("/api/host", { host });
   const selfHosted = useSelfHosted();
   return (
@@ -961,7 +964,7 @@ function Settings({ state, onClose }: { state: AppState; onClose: () => void }) 
         <div className="flex items-center justify-between border-b border-[#F0F0EE] px-[22px] py-[18px]">
           <div className="flex flex-col gap-0.5">
             <span className="text-[18px] font-semibold leading-[22px]">Settings</span>
-            <span className="text-[13px] leading-[17px] text-[#6B6B6B]">You, how your bots reach you, this Mac, and where your bots work</span>
+            <span className="text-[13px] leading-[17px] text-[#6B6B6B]">You, how your bots reach you, and where your bots work</span>
           </div>
           <button onClick={onClose} aria-label="Close" className="flex size-8 items-center justify-center rounded-full shadow-[0_0_0_1px_#E6E6E3]">
             <svg width="12" height="12" viewBox="0 0 12 12">
@@ -979,14 +982,14 @@ function Settings({ state, onClose }: { state: AppState; onClose: () => void }) 
         <div className="flex flex-col gap-2 px-[22px] pt-4">
           <span className="text-[13px] font-semibold">Where your bots work</span>
           <div className="flex gap-2.5">
-            {(["orgo", "mac"] as const).map((h) => (
+            {(["orgo", "mac"] as const).filter(h => !windows || h !== "mac").map((h) => (
               <button key={h} onClick={() => setHost(h)} className={`flex flex-1 flex-col gap-1.5 rounded-[14px] p-3.5 text-left ${option(state.host === h)}`}>
                 <span className="flex items-center justify-between">
                   <span className="text-[14px] font-semibold">{h === "orgo" ? "Their own cloud computers" : "This Mac"}</span>
                   {radio(state.host === h)}
                 </span>
                 <span className="text-[12.5px] leading-[18px] text-[#6B6B6B]">
-                  {h === "orgo" ? "Your bots use a cloud computer with 4 screens. This Mac’s background coordinator must stay powered, online, and signed in. A bot can have one of its own." : "Bots work in background browsers on this Mac, from your own internet connection."}
+                  {h === "orgo" ? "Your bots use a cloud computer with 4 screens. This computer must stay powered, online, and signed in. A bot can have one of its own." : "Bots work in background browsers on this Mac, from your own internet connection."}
                 </span>
               </button>
             ))}

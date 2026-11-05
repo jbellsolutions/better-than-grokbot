@@ -17,10 +17,10 @@ import { getState, update } from "./store";
  * at another cloud (staging, or one running on this Mac).
  */
 
-export const cloudUrl = () => (process.env.BOPS_CLOUD_URL || "https://bops.orgo.ai/api").replace(/\/+$/, "");
+export const cloudUrl = () => (process.env.BOPS_CLOUD_URL || "").replace(/\/+$/, "");
 
 /** Whether services go through Bops Cloud: signed in with Orgo, in the app on a Mac, and not self-hosting. */
-export const cloudOn = () => !!orgoKey() && process.env.BOPS_SELF_HOSTED !== "1" && !onPostgres();
+export const cloudOn = () => process.env.BOPS_DISTRIBUTION !== "better-than-grokbot" && !!orgoKey() && process.env.BOPS_SELF_HOSTED !== "1" && !onPostgres();
 
 /**
  * A call to Bops Cloud that didn't work, in words the app can show. `status` is the cloud's HTTP status
@@ -38,6 +38,7 @@ export class CloudError extends Error {
 
 /** A request to Bops Cloud as the signed-in user (their Orgo key as Bearer). `fetchImpl` lets a test check the wire shape. */
 export async function cloudFetch(path: string, init: RequestInit = {}, fetchImpl: typeof fetch = fetch): Promise<Response> {
+  if (process.env.BOPS_DISTRIBUTION === "better-than-grokbot") throw new CloudError("Use your own provider connections in Settings.");
   const key = orgoKey();
   if (!key) throw new CloudError("Sign in with Orgo first.");
   const headers = new Headers(init.headers);
@@ -45,15 +46,15 @@ export async function cloudFetch(path: string, init: RequestInit = {}, fetchImpl
   try {
     return await fetchImpl(`${cloudUrl()}${path}`, { cache: "no-store", signal: AbortSignal.timeout(20_000), ...init, headers });
   } catch {
-    throw new CloudError("Couldn't reach Bops Cloud. Check your internet connection.");
+    throw new CloudError("Couldn't reach Better Than GrokBot Cloud. Check your internet connection.");
   }
 }
 
 /** What a failed answer means, for the user. Out of AI credit (402), the cloud's own words. */
 function problem(status: number, said?: string) {
-  if (status === 401) return "Bops Cloud didn't accept your Orgo sign-in. Sign out and sign in again.";
-  if (status >= 500) return `Bops Cloud isn't working right now (${status}). Try again in a minute.`;
-  return said || `Bops Cloud turned the request down (${status}).`;
+  if (status === 401) return "Better Than GrokBot Cloud didn't accept your Orgo sign-in. Sign out and sign in again.";
+  if (status >= 500) return `Better Than GrokBot Cloud isn't working right now (${status}). Try again in a minute.`;
+  return said || `Better Than GrokBot Cloud turned the request down (${status}).`;
 }
 
 /** A JSON call to Bops Cloud: its answer, or a CloudError that says what went wrong. */
@@ -61,7 +62,7 @@ export async function cloudJson<T>(path: string, init: RequestInit = {}): Promis
   const res = await cloudFetch(path, init);
   const body = (await res.json().catch(() => null)) as (T & { error?: unknown; code?: unknown }) | null;
   if (!res.ok) throw new CloudError(problem(res.status, typeof body?.error === "string" ? body.error : undefined), res.status, typeof body?.code === "string" ? body.code : undefined);
-  if (body === null || typeof body !== "object") throw new CloudError("Bops Cloud sent back something Bops couldn't read.", res.status);
+  if (body === null || typeof body !== "object") throw new CloudError("Better Than GrokBot Cloud sent back something Better Than GrokBot couldn't read.", res.status);
   return body;
 }
 
@@ -90,7 +91,7 @@ export function cloudSession(fresh = false): Promise<CloudSession> {
   if (!fresh && box.failed?.key === key && Date.now() - box.failed.at < RETRY_MS) return Promise.reject(box.failed.error);
   const answer: Promise<CloudSession> = cloudJson<CloudSession>("/v1/session", { method: "POST" }).then(
     (value) => {
-      if (typeof value.userId !== "string") throw new CloudError("Bops Cloud sent back something Bops couldn't read.");
+      if (typeof value.userId !== "string") throw new CloudError("Better Than GrokBot Cloud sent back something Better Than GrokBot couldn't read.");
       // A sign-out or another sign-in while it was out has the last word.
       if (box.asking?.answer === answer) box.session = { key, value };
       return value;
@@ -140,7 +141,7 @@ export function cloudProxy(provider: "openai" | "agentphone" | "honcho" | "compo
 export async function executorKey(): Promise<string> {
   if (!cloudOn()) return process.env.OPENAI_EXECUTOR_API_KEY ?? "";
   const key = (await cloudSession()).openai?.executorKey;
-  if (!key) throw new CloudError("Bops Cloud can't run tasks on computers right now.");
+  if (!key) throw new CloudError("Better Than GrokBot Cloud can't run tasks on computers right now.");
   return key;
 }
 

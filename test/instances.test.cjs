@@ -35,7 +35,7 @@ test('setup preserves the current team byte for byte and reruns preserve each ne
   assert.equal(JSON.parse(fs.readFileSync(file(entries[1]))).messages[0].text, 'Saved conversation');
   assert.equal(JSON.parse(fs.readFileSync(file(entries[2]))).messages.length, 0);
   assert.equal(fs.readFileSync(path.join(root, '.data/state.json'), 'utf8'), '{"existing":"preserve exactly"}');
-  assert.equal(fs.statSync(file(entries[2])).mode & 0o777, 0o600);
+  if (process.platform !== 'win32') assert.equal(fs.statSync(file(entries[2])).mode & 0o777, 0o600);
 });
 
 test('business instances exclude shared provider identities and subscriptions but retain inference configuration', t => {
@@ -62,7 +62,7 @@ test('default paths and secrets stay compatible; business instances have indepen
   const ai = loadInstance({ env: instanceEnv(root, entries[1], {}), cwd: () => root });
   const rev = loadInstance({ env: instanceEnv(root, entries[2], {}), cwd: () => root });
   assert.equal(current.dataPath('state.json'), path.join(root, '.data/state.json'));
-  assert.equal(current.keychainService(), 'Bops Vault');
+  assert.equal(current.keychainService(), 'Better Than GrokBot Vault');
   for (const resource of ['state.json', 'openrouter/same.json', 'models.json', 'phone-secrets.json', 'memory-reviews.json', 'uploads/same.png', 'pages/same.html']) assert.notEqual(ai.dataPath(resource), rev.dataPath(resource));
   assert.notEqual(ai.keychainService(), rev.keychainService());
   assert.notEqual(ai.localHome(), rev.localHome());

@@ -1,7 +1,7 @@
 {
   "name": "better-than-grokbot",
   "description": "A self-hosted AI team that gets work done on your Mac and cloud computers.",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "private": true,
   "license": "SEE LICENSE IN LICENSE",
   "scripts": {
@@ -25,7 +25,9 @@
     "instances:enable": "node scripts/instances.cjs enable",
     "instances:status": "node scripts/instances.cjs status",
     "site:package": "node scripts/package-site.cjs",
-    "brand:render": "node scripts/render-brand.mjs"
+    "brand:render": "node scripts/render-brand.mjs",
+    "app:build:windows": "node windows/build.cjs",
+    "test:windows": "node --test windows/*.test.cjs"
   },
   "dependencies": {
     "@ag-ui/core": "1.0.1",

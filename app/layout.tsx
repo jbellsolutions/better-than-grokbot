@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Better than GrokBot",
+  title: "Better Than GrokBot",
   description: "AI coworkers with their own computers.",
 };
 

@@ -6,6 +6,7 @@ import { workStatus } from "@/lib/work-status";
 import type { Section } from "./bot-panel";
 import { Mascot } from "./mascot";
 import { MacIcon } from "./mac-tab";
+import { useWindowsApp } from "./mac-screens";
 import { KeyIcon } from "./screen-cards";
 import { MonitorIcon, teamOf } from "./ui";
 
@@ -78,6 +79,7 @@ export function TabBar({
 }
 
 function Tab({ state, tab: t, on, closable, onPick, onClose }: { state: AppState; tab: PanelTab; on: boolean; closable: boolean; onPick: () => void; onClose: () => void }) {
+  const windows = useWindowsApp();
   const b = "botId" in t ? state.bots.find((x) => x.id === t.botId) : undefined;
   // A computer tab says when its bot is working, or when something there needs you.
   const tasks = state.sessions.filter(s => t.kind === "computer" ? s.botId === t.botId && s.runsOn !== "mac" : t.kind === "mac" && s.runsOn === "mac").map(workStatus);
@@ -88,7 +90,7 @@ function Tab({ state, tab: t, on, closable, onPick, onClose }: { state: AppState
       (state.watches?.some((w) => w.botId === t.botId && w.alert) || tasks.some(s => s.attention))) ||
     (t.kind === "mac" && (!!state.mac?.approvals.length || tasks.some(s => s.attention)));
   const label =
-    t.kind === "computer" ? `${b?.name ?? "Bot"}'s computer` : t.kind === "bot" ? (b?.name ?? "Bot") : t.kind === "web" ? t.title || hostOf(t.url) : t.kind === "business" ? "Business desk" : t.kind === "vault" ? "Vault" : t.kind === "mac" ? "Your Mac" : "New tab";
+    t.kind === "computer" ? `${b?.name ?? "Bot"}'s computer` : t.kind === "bot" ? (b?.name ?? "Bot") : t.kind === "web" ? t.title || hostOf(t.url) : t.kind === "business" ? "Business desk" : t.kind === "vault" ? "Vault" : t.kind === "mac" ? (windows ? "Your PC" : "Your Mac") : "New tab";
   return (
     <div
       onClick={onPick}
@@ -264,6 +266,7 @@ export function NewTab({
   onVault: () => void;
   onMac: () => void;
 }) {
+  const windows = useWindowsApp();
   const [address, setAddress] = useState("");
   const go = () => {
     if (address.trim()) onWeb(toAddress(address));
@@ -344,8 +347,8 @@ export function NewTab({
             <MacIcon />
           </span>
           <span className="flex flex-col">
-            <span className="text-[14px] font-medium leading-[18px]">Your Mac</span>
-            <span className="text-[12px] leading-4 text-[#6B6B6B]">{state.mac?.ready ? "Where bots work when a task needs your Mac" : (state.mac?.reason ?? "Checking…")}</span>
+            <span className="text-[14px] font-medium leading-[18px]">{windows ? "Your PC" : "Your Mac"}</span>
+            <span className="text-[12px] leading-4 text-[#6B6B6B]">{windows ? "View this PC’s screens and windows" : state.mac?.ready ? "Where bots work when a task needs your Mac" : (state.mac?.reason ?? "Checking…")}</span>
           </span>
         </button>
         <span className="px-1 text-[12px] font-medium leading-4 text-[#9A9A98]">Your bots</span>

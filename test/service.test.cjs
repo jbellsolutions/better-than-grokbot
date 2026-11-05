@@ -27,7 +27,7 @@ test('managed Electron startup asks launchd to start the server instead of ownin
   const declaration = source.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === 'startServer');
   const calls = [];
   let checks = 0;
-  const context = { serverUp: async () => ++checks > 1, fs: { existsSync: () => true }, path: require('node:path'), REPO: '/test',
+  const context = { PORT: 3210, URL: "http://localhost:3210", serverUp: async () => ++checks > 1, fs: { existsSync: () => true }, path: require('node:path'), REPO: '/test',
     process: { platform: 'darwin', getuid: () => 501 }, execFileSync: (...args) => calls.push(args), setTimeout,
     portTaken: () => { throw Error('managed clients must not start their own server'); } };
   vm.runInNewContext(declaration.getText(source), context);

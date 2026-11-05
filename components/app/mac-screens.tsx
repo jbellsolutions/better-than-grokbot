@@ -13,12 +13,14 @@ type Screens = { access: string; displays: Display[]; sources: Source[]; bopsOn?
 
 declare global {
   interface Window {
-    bopsMac?: { screens: () => Promise<Screens>; openScreenSettings: () => Promise<void> };
+    bopsMac?: { platform?: string; screens: () => Promise<Screens>; openScreenSettings: () => Promise<void> };
   }
 }
 
 const noop = () => () => {};
 /** True inside the Bops Mac app (false while rendering on the server, so the page hydrates cleanly). */
+export const useWindowsApp = () => useSyncExternalStore(noop, () => window.bopsMac?.platform === "win32", () => false);
+
 export const useMacApp = () => useSyncExternalStore(noop, () => !!window.bopsMac, () => false);
 
 /** The displays and windows the Mac app can show, checked every few seconds (displays come and go). */

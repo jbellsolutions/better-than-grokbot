@@ -1,4 +1,4 @@
-/** Shared vector arrow figures for Better than GrokBot's app, desktops and channel avatars.
+/** Shared vector arrow figures for Better Than GrokBot's app, desktops and channel avatars.
  * Legacy IDs and picture filenames remain compatible with saved state and existing integrations.
  */
 

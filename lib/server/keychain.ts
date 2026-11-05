@@ -1,5 +1,6 @@
 import { keychainService } from "./instance";
 import "server-only";
+import { windowsSecret } from "./windows-vault";
 import { execFile, spawn } from "node:child_process";
 
 /**
@@ -11,8 +12,10 @@ const SERVICE = keychainService();
 const q = (s: string) => `"${s.replace(/["\\]/g, "")}"`;
 
 export function setSecret(account: string, value: string, service = SERVICE) {
+  if (process.platform === "win32") return windowsSecret("set", `${service}:${account}`, value).then(() => {});
   return new Promise<void>((resolve, reject) => {
     const p = spawn("security", ["-i"], { stdio: ["pipe", "ignore", "pipe"] });
+    p.on("error", reject);
     let err = "";
     p.stderr.on("data", (d) => (err += d));
     p.on("close", (code) => (code === 0 && !err.trim() ? resolve() : reject(new Error(`Keychain refused it: ${err.trim() || code}`))));
@@ -21,11 +24,13 @@ export function setSecret(account: string, value: string, service = SERVICE) {
 }
 
 export function getSecret(account: string, service = SERVICE) {
+  if (process.platform === "win32") return windowsSecret("get", `${service}:${account}`);
   return new Promise<string | null>((resolve) =>
     execFile("security", ["find-generic-password", "-s", service, "-a", account, "-w"], (e, out) => resolve(e ? null : out.replace(/\n$/, ""))),
   );
 }
 
 export function deleteSecret(account: string, service = SERVICE) {
+  if (process.platform === "win32") return windowsSecret("delete", `${service}:${account}`).then(() => {});
   return new Promise<void>((resolve) => execFile("security", ["delete-generic-password", "-s", service, "-a", account], () => resolve()));
 }

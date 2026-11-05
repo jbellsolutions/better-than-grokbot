@@ -14,7 +14,7 @@ function desktop() {
   let failure;
   const makeWindow = id => ({ id, draft: `${id} unsent draft`, hidden: false, isDestroyed: () => false, isMinimized: () => false, hide() { this.hidden = true; }, show() { this.hidden = false; }, focus() {}, restore() {} });
   windows.set('default', makeWindow('default'));
-  const context = { ipcMain: { handle: (_, h) => { handler = h; } }, readRegistry: () => entries, REPO: '/project', instanceWindows: windows, openingInstances: new Map(),
+  const context = { ipcMain: { handle: (_, h) => { handler = h; } }, readRegistry: () => entries, REPO: '/project', registryRoot: () => '/project', app: { isPackaged: false }, instanceWindows: windows, openingInstances: new Map(),
     verify: async () => { if (failure) throw failure; }, BrowserWindow: { fromWebContents: sender => windows.get(sender.id) },
     createWindow: async id => { created.push(id); windows.set(id, makeWindow(id)); } };
   vm.runInNewContext(statement.getText(source), context);

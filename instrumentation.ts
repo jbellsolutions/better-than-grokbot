@@ -5,6 +5,10 @@
  */
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
+  if (process.env.BOPS_DISTRIBUTION === "better-than-grokbot") {
+    const { loadDesktopProvider } = await import("./lib/server/desktop-setup");
+    await loadDesktopProvider();
+  }
   if (process.env.BOPS_DATABASE_URL) {
     const { hydrateState } = await import("./lib/server/store");
     await hydrateState();

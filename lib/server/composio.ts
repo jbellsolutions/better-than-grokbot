@@ -175,11 +175,11 @@ async function authConfigFor(app: string) {
   const ready = items.filter((a) => a.status === "ENABLED").sort((a, b) => Number(!!a.isComposioManaged) - Number(!!b.isComposioManaged))[0];
   if (ready) return ready.id;
   const tk = await cx().toolkits.get(app);
-  if (tk.composioManagedAuthSchemes?.length) return (await cx().authConfigs.create(app, { type: "use_composio_managed_auth", name: `${tk.name} (Bops)` })).id;
+  if (tk.composioManagedAuthSchemes?.length) return (await cx().authConfigs.create(app, { type: "use_composio_managed_auth", name: `${tk.name} (Better Than GrokBot)` })).id;
   // Through Bops Cloud, a setup of our own can only ask each person for their own key (see ownKeyScheme).
   const mode = cloudOn() ? tk.authConfigDetails?.find((d) => ownKeyScheme(d.mode))?.mode : tk.authConfigDetails?.[0]?.mode;
-  if (!mode) throw new Error(`${tk.name} can't be connected from Bops yet`);
-  return (await cx().authConfigs.create(app, { type: "use_custom_auth", authScheme: mode as never, name: `${tk.name} (Bops)`, credentials: {} })).id;
+  if (!mode) throw new Error(`${tk.name} can't be connected from Better Than GrokBot yet`);
+  return (await cx().authConfigs.create(app, { type: "use_custom_auth", authScheme: mode as never, name: `${tk.name} (Better Than GrokBot)`, credentials: {} })).id;
 }
 
 /**
@@ -468,7 +468,7 @@ export const APP_TOOLS = (b: Bot) => {
     {
       type: "function" as const,
       name: "use_app",
-      description: `Run one action in ${owner}'s apps (${list}): an exact name from find_app_actions, with its inputs. Reading runs at once. Anything that sends, creates, changes or pays asks ${owner} first; Bops shows them the details.`,
+      description: `Run one action in ${owner}'s apps (${list}): an exact name from find_app_actions, with its inputs. Reading runs at once. Anything that sends, creates, changes or pays asks ${owner} first; Better Than GrokBot shows them the details.`,
       parameters: {
         type: "object",
         additionalProperties: false,
@@ -578,7 +578,7 @@ export async function runAppAction(
   noteOutcome(decision.approvalId, ask);
   if (onAsk) {
     onAsk(ask);
-    return `This needs ${ownerName()}'s approval first: ${info.name} in ${where_}. Bops is showing them the details. Tell them in one short line, and don't call it again.`;
+    return `This needs ${ownerName()}'s approval first: ${info.name} in ${where_}. Better Than GrokBot is showing them the details. Tell them in one short line, and don't call it again.`;
   }
   return ask;
 }
